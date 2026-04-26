@@ -1,0 +1,255 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`literary list renderers > renders the literary fiction # BANNED PHRASES list > literary-fiction 1`] = `
+"- NEVER: "eyes wide with [emotion]"
+  INSTEAD: Name what the face does without the 'eyes wide' kit — lids, focus, or where the look lands.
+  Example:
+    Not: "Her eyes were wide with wonder."
+    Yes: "She didn't blink until the first bell; her gaze stayed on the wire, not the crowd."
+
+- NEVER: "heart swelling / quickened / lifted / raced"
+  INSTEAD: Lose the cardio stock verbs; use breath, weight in the limbs, or a specific mistake in movement.
+  Example:
+    Not: "Her heart swelled with relief."
+    Yes: "The knot between her shoulder blades unclenched, and the pen rolled off the table."
+
+- NEVER: "tinged with / bubbling with / bright with (emotion cluster)"
+  INSTEAD: One concrete image or one line of subtext, not a triple-decker emotion adjective stack.
+  Example:
+    Not: "His voice was tinged with pride and regret."
+    Yes: "He said 'fine' the way a person does when the word is a door held shut."
+
+- NEVER: "a mix of [X] and [Y] (feeling)"
+  INSTEAD: Show one clear dominant feeling and let the second arrive as contradiction in behavior.
+  Example:
+    Not: "She felt a mix of excitement and dread."
+    Yes: "She was already smiling when her hands started packing the go-bag."
+
+- NEVER: "velvet blanket of stars / sky / night"
+  INSTEAD: Describe night with light sources and limits: moon phase, a porch bulb, a neighbor's window.
+  Example:
+    Not: "The night sky was a velvet blanket of stars."
+    Yes: "The Milky Way was a smear, but Mars hung alone over the barn like a small nail hole."
+
+- NEVER: "ethereal/golden/soft/warm/gentle glow"
+  INSTEAD: Name a single light source and one surface it hits; drop 'glow' unless the scene is about lamps.
+  Example:
+    Not: "An ethereal golden glow suffused the room."
+    Yes: "The one working sconce had a 40-watt bulb; it buttered the crown molding, nothing more."
+
+- NEVER: "pinprick of light"
+  INSTEAD: Name the object emitting light or the reason visibility exists — 'pinprick' is a postcard phrase.
+  Example:
+    Not: "He saw a pinprick of light in the distance."
+    Yes: "A single window on the ridge, no curtains; someone was awake with the same insomnia."
+
+- NEVER: "bathed in [light/moonlight/sunlight]"
+  INSTEAD: Cut 'bathed'; use angle, color temperature, and what the light fails to reach.
+  Example:
+    Not: "She was bathed in morning sunlight."
+    Yes: "The sun caught half her face; the other half was still the night kitchen."
+
+- NEVER: "the air was tinged with / filled with / alive with"
+  INSTEAD: Put one smell, sound, or particulate the POV can name — the air is not a character.
+  Example:
+    Not: "The air was thick with unspoken words."
+    Yes: "The laundry vent pumped damp heat; every sentence stuck halfway."
+
+- NEVER: "a sense of [wonder/peace/resolve/purpose/belonging]"
+  INSTEAD: Show the behavior that would follow that feeling, not a label with 'a sense of.'
+  Example:
+    Not: "He felt a sense of belonging for the first time."
+    Yes: "He took his shoes off in the hall without being asked, and no one flinched."
+
+- NEVER: "cosmic (lazy adjective)"
+  INSTEAD: If scale matters, be literal: orbit, season, map grid — 'cosmic' is nine times out of ten a vague intensifier.
+  Example:
+    Not: "Their cosmic quest across the high seas…"
+    Yes: "They had twelve nautical miles to clear before the radio died."
+
+- NEVER: "the universe seemed to [breathe / hold its breath / whisper / approve]"
+  INSTEAD: Keep the camera human-scale; no personified universe unless the genre is explicit mythic POV.
+  Example:
+    Not: "The universe seemed to hold its breath with them."
+    Yes: "The crickets were late that year, and the streetlight buzz was the only steady sound."
+
+- NEVER: "stars twinkled with approval / in agreement / with secrets"
+  INSTEAD: Stars are not a Greek chorus. Note weather, light pollution, or a named constellation, period.
+  Example:
+    Not: "The stars twinkled in approval of their plan."
+    Yes: "Orion was already gone behind the oaks; they had the sky they deserved, not a verdict."
+
+- NEVER: "infectious enthusiasm / boundless curiosity / unbridled joy"
+  INSTEAD: Show a single unforced gesture that implies energy; not three abstract intensifiers.
+  Example:
+    Not: "She had boundless curiosity and infectious enthusiasm."
+    Yes: "She was on page forty while the rest of them were still on the handout, footnotes and all."
+
+- NEVER: "dramatic flourish"
+  INSTEAD: Describe the physical motion or sound instead of the meta-label 'flourish.'
+  Example:
+    Not: "He opened the case with a dramatic flourish."
+    Yes: "He flipped the latches in one stroke, the way a medic opens a field kit — click-click, not theatre."
+
+- NEVER: "Chapter endings that are a gauzy promise of future adventure"
+  INSTEAD: End with friction still in the object world — a ticket, a door, a debt — not a tease about epic sequels.
+  Example:
+    Not: "The real adventure, she sensed, was only just beginning…"
+    Yes: "The car wouldn't start, and the ferry horn sounded twice — a schedule, not a promise.""
+`;
+
+exports[`literary list renderers > renders the literary nonfiction business slop list > literary-nf 1`] = `
+"- NEVER: "paradigm shift / at the end of the day / it's a journey / unlock your potential / game-changer / deep dive"
+  INSTEAD: Use plain work verbs and one scene from the reader's day job; replace each cliché with a testable action.
+  Example:
+    Not: "We need a paradigm shift to unlock your team's potential and move forward on this deep dive journey."
+    Yes: "Run one pilot; measure three metrics for six weeks; keep or kill the process based on the log files."
+
+- NEVER: "In today's fast-paced world"
+  INSTEAD: Name the year, the constraint, the speed that actually hurts — not 'fast-paced' throat-clearing.
+  Example:
+    Not: "In today's fast-paced business environment, email never stops."
+    Yes: "In 2023 our median reply time to clients was 11 minutes, even on weekends; that was the baseline we had to name."
+
+- NEVER: "soft landing mutual affirmation ending"
+  INSTEAD: End with a tension (trade-off, open question, next experiment) — not a shared hug between author and reader.
+  Example:
+    Not: "You have everything you need; go believe in your journey, together and apart."
+    Yes: "If you can only do one of the two exercises this week, do the one that costs money — the free one will wait.""
+`;
+
+exports[`renderBannedPhrasesBlock > produces stable blurb inline fragment > blurb 1`] = `"Avoid "in a world where…": Set one specific year, place, or condition instead of a genre thesis. Example: Not "In a world where water is currency…" — Yes: "In 2041 the county aquifer failed—then the lawyers showed up in rented sedans." Avoid "little did they know…": Imply foreshadowing with a concrete object or date, not a wink to the camera. Example: Not "Little did they know their quiet summer would end in fire." — Yes: "They signed the easement the week before the arson spree, name spelled wrong on the line." Avoid "but everything changes when…": Name a single event that breaks the status quo — no 'everything changes' boilerplate. Example: Not "But everything changes when a stranger arrives with a secret." — Yes: "The stranger brought only a sealed envelope and the deed to a house nobody remembered buying." Avoid "a thrilling tale of…": Use nouns: who wants what, who stands in the way — not 'a thrilling tale of.' Example: Not "A thrilling tale of love and vengeance in the high seas." — Yes: "A harpooner returns to a port that blacklisted his family to steal back one boat." Avoid "an unforgettable journey": Pin stakes to a route, job, or season; drop 'journey' unless the plot is literally travel with a map. Example: Not "An unforgettable journey of self-discovery." — Yes: "Three Greyhound tickets and a half-read letter: that's what she has when she leaves Omaha." Avoid "you won't want to put it down": Show tension with a last-line hook or a named risk — not a review blurb in advance. Example: Not "You won't want to put it down until the last page." — Yes: "By chapter three the reader will know the safe code; the book is whether anyone dares to use it." Avoid "a must-read for fans of…": If you use comps, one crisp pair beats a genre buffet string. Example: Not "A must-read for fans of Tana French and The Wire." — Yes: "For readers who like Tana French's procedural guilt more than the killer reveal.""`;
+
+exports[`renderBannedPhrasesBlock > produces stable fiction (chapter) SLOP text > chapter-fiction 1`] = `
+"## SLOP FILTERS — these are absolute
+
+When you are about to use one of the stock phrases below, do not
+pattern-match around the surface form. Replace it with a concrete, scene-specific move (see each INSTEAD and Example).
+
+## BANNED: descriptive tics from the AI training-data mean
+- NEVER: "Her eyes twinkled / widened / lit up / darted / narrowed"
+  INSTEAD: Replace stock eye-reactions with a specific action or observation the POV character performs. Eyes don't have vocabulary; hands, posture, and dialogue do.
+  Example:
+    Not: "Her eyes twinkled with mischief."
+    Yes: "She said it without quite looking at him, which was how he knew she was about to do something he'd have to apologize for later."
+- NEVER: "A shiver ran down her spine"
+  INSTEAD: Swap the spine cliché for a specific, localizable sensation: skin, sound, or a small action.
+  Example:
+    Not: "A shiver ran down her spine."
+    Yes: "The backs of her hands prickled; she pushed her sleeves down and kept walking."
+- NEVER: "She let out a breath she didn't know she was holding"
+  INSTEAD: Breath-releases as relief-markers are a common AI-fiction tic. Replace with a specific physical action that implies relief — unclenching, sitting, noticing ambient sound again.
+  Example:
+    Not: "She let out a breath she didn't know she was holding."
+    Yes: "Her hand, which had been gripping the door frame, slackened."
+- NEVER: "Her heart hammered / pounded in her chest"
+  INSTEAD: Name what the body does without the cardio-metaphor. Audible pulse, breath, a held muscle, a mistake in movement.
+  Example:
+    Not: "Her heart hammered in her chest."
+    Yes: "She could hear her own pulse in her ears, too loud, like a tell at a card table."
+- NEVER: "A smile tugged at the corner of his mouth"
+  INSTEAD: Show an asymmetry in the face with one concrete detail instead of a stock smile idiom.
+  Example:
+    Not: "A smile tugged at the corner of his mouth."
+    Yes: "Only one side of his mouth moved, and that was worse than a full grin."
+- NEVER: "His jaw tightened"
+  INSTEAD: Replace the jaw clamp with a specific gesture: food, drink, a sentence stopped halfway, a neck movement.
+  Example:
+    Not: "His jaw tightened."
+    Yes: "He set his coffee down with enough care to make the saucer rattle once."
+- NEVER: "She felt a warmth spreading through her chest"
+  INSTEAD: Let the body show relief or affection with an action, not a glowing torso.
+  Example:
+    Not: "She felt a warmth spreading through her chest."
+    Yes: "She unzipped her coat in the cold vestibule anyway, as if the building owed her that."
+- NEVER: "The silence was deafening"
+  INSTEAD: Make silence concrete: a small sound that wasn't there before, a held posture, a room-specific detail.
+  Example:
+    Not: "The silence was deafening."
+    Yes: "The fridge clicked off, and the kitchen had that flat, unanswerable quiet after."
+- NEVER: "Stock body-cue internal state"
+  INSTEAD: If the line only labels an emotion through a body cliché, replace it with one observable behavior or one line of thought tied to a concrete object.
+  Example:
+    Not: "Guilt sat heavy in her stomach."
+    Yes: "She found herself alphabetizing the spice rack, which was what she did when she didn't want the real task."
+
+## BANNED: the Pinterest-quote ending
+- NEVER: "Narrator aphorism chapter endings"
+  INSTEAD: End on an image, a line of speech, or a problem still open — not a lesson about life.
+  Example:
+    Not: "In the end, she realized friendship was the real treasure."
+    Yes: "The bus doors hissed open two stops early, and she stepped off before she could name why."
+- NEVER: "Forbidden closing registers"
+  INSTEAD: Cut these closing stock registers entirely; land on a sensory beat or a line only this character would say.
+  Example:
+    Not: "Maybe that was what growing up was, she thought: learning to let go."
+    Yes: "She pocketed the ticket stub even though the show had been a disaster."
+- NEVER: "Chapter ending on specific image, dialogue, or question"
+  INSTEAD: Prefer an unanswered question, a last line of dialogue, or a single visual beat over reflection.
+  Example:
+    Not: "The chapter closed on a thought about how much everything had changed."
+    Yes: ""You still have my screwdriver," she said. The porch light was already off."
+
+## BANNED: real living public figures
+- NEVER: "Real living public figures as speaking characters"
+  INSTEAD: Invent a fictional figure in the same social role. Keep scale human and speakable; never put scripted lines in a real, living public person's mouth.
+  Example:
+    Not: "The CEO leaned in. "We will disrupt agriculture," the founder said, lines written for a real tech mogul."
+    Yes: "A regional buyer she called only "Mitchell" in her head had agreed to one trial acre — the rest was still a fight."
+- NEVER: "Invented quotes attributed to real people"
+  INSTEAD: If you need a pithy line, make it an anonymous paraphrase, a fictional name, or clearly labeled folklore — never a fake direct quote on a real person.
+  Example:
+    Not: "The epigraph read, "Courage is a habit" — Dr. Fauci, 2020."
+    Yes: "The epigraph was from a county extension pamphlet, author unknown, copyright worn off at the corner."
+
+## BANNED: bullet-point narrative structure
+- NEVER: "What they knew: / What they had: narrative lists"
+  INSTEAD: Render status as a scene: two concrete facts, one pressure that forces a choice, no colon-led inventory.
+  Example:
+    Not: "What they knew: the road was long. What they had: a bad map, each other, and a dented thermos."
+    Yes: "The map was wrong in two places before lunch; the thermos clanked when he set it down, and she pretended not to notice the leak."
+
+## BANNED: the "world is watching" resolution
+- NEVER: "World is watching / global movement resolution"
+  INSTEAD: Keep the resolution in the room, on the block, in the subculture. No viral fame, no globe-spanning hope montage, unless the brief is explicitly satirical.
+  Example:
+    Not: "By spring, #RiverKids had children writing letters on every continent."
+    Yes: "The farmer's co-op let her use the weigh station for one Saturday; two counties showed, and that was the whole world that mattered."
+
+## BANNED: authorial wisdom sentences
+- NEVER: "Authorial wisdom sentences"
+  INSTEAD: If a sentence's only job is a universal about human nature, cut it or replace with a line tied to a specific object, habit, or stake in this story.
+  Example:
+    Not: "People are strange about the things they choose to care about."
+    Yes: "She had hung the calendar with the free nail from the phone-company keychain and never moved it, even after the company folded.""
+`;
+
+exports[`renderBannedPhrasesBlock > produces stable nonfiction BANNED MOVES block > chapter-nonf 1`] = `
+"BANNED MOVES (apply the swap, not a surface rewrite around the ban):
+
+- NEVER: "Transition summary sentences (As we've seen...)"
+  INSTEAD: Bridge with the next tool, question, or problem — not a recap. Point forward, not backward.
+  Example:
+    Not: "As we've seen, trust is a key factor in any negotiation."
+    Yes: "The next number to test is not whether they like you, but what they have already conceded once."
+
+- NEVER: "Hedging authority dilution"
+  INSTEAD: Name scope honestly once (who, when) instead of smearing the claim with 'often' and 'some'.
+  Example:
+    Not: "In many cases, teams can benefit from a clearer handoff."
+    Yes: "In the twelve teams I coached last year, the failure mode was the same: nobody owned the handoff."
+
+- NEVER: "Examples without specificity"
+  INSTEAD: Swap placeholders for one named company, one date, or one verifiable detail; otherwise compress to principle without a fake case study.
+  Example:
+    Not: "A major retailer improved retention by listening to its staff."
+    Yes: "Target's 2011 cart-attendant pilot cut shrink in test stores before it rolled up."
+
+- NEVER: "Motivational aphorism chapter ending"
+  INSTEAD: End on a concrete next step, a tension left open, or a fact that implies action — not a pep talk to the reader.
+  Example:
+    Not: "The only question left is: what will you do with this knowledge?"
+    Yes: "Fill in the one-line summary at the end of the worksheet before you start Monday's call.""
+`;
+
+exports[`renderBannedPhrasesBlock > produces stable rewrite tics string > rewrite 1`] = `"no "eyes twinkled/widened/lit up," INSTEAD: Replace stock eye-reactions with a specific action or observation the POV character performs. Eyes don't have vocabulary; hands, posture, and dialogue do. (e.g. Not: "Her eyes twinkled with mischief." / Yes: "She said it without quite looking at him, which was how he knew she was about to do something he'd have to apologize for later.") no "she let out a breath she didn't know she was holding," INSTEAD: Breath-releases as relief-markers are a common AI-fiction tic. Replace with a specific physical action that implies relief — unclenching, sitting, noticing ambient sound again. (e.g. Not: "She let out a breath she didn't know she was holding." / Yes: "Her hand, which had been gripping the door frame, slackened.") no "her heart hammered in her chest," INSTEAD: Name what the body does without the cardio-metaphor. Audible pulse, breath, a held muscle, a mistake in movement. (e.g. Not: "Her heart hammered in her chest." / Yes: "She could hear her own pulse in her ears, too loud, like a tell at a card table.") no authorial wisdom aphorisms. INSTEAD: If a sentence's only job is a universal about human nature, cut it or replace with a line tied to a specific object, habit, or stake in this story. (e.g. Not: "People are strange about the things they choose to care about." / Yes: "She had hung the calendar with the free nail from the phone-company keychain and never moved it, even after the company folded.")"`;

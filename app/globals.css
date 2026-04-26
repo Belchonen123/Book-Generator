@@ -1,0 +1,639 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-dm-sans: var(--next-dm-sans), system-ui, sans-serif;
+    --font-playfair: var(--next-playfair), Georgia, serif;
+    /* Dark editorial defaults — ChapterAI / shadcn-compatible HSL tokens */
+    --background: 228 21% 8%;
+    --foreground: 43 46% 89%;
+    --card: 229 28% 14%;
+    --card-foreground: 43 46% 89%;
+    --popover: 229 28% 14%;
+    --popover-foreground: 43 46% 89%;
+    --primary: 45 54% 54%;
+    --primary-foreground: 228 21% 8%;
+    --secondary: 229 28% 18%;
+    --secondary-foreground: 43 46% 89%;
+    --muted: 229 20% 22%;
+    --muted-foreground: 231 15% 60%;
+    --accent: 45 54% 54%;
+    --accent-foreground: 228 21% 8%;
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 43 46% 98%;
+    --border: 229 22% 22%;
+    --input: 229 22% 22%;
+    --ring: 45 54% 54%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 228 21% 8%;
+    --foreground: 43 46% 89%;
+    --card: 229 28% 14%;
+    --card-foreground: 43 46% 89%;
+    --popover: 229 28% 14%;
+    --popover-foreground: 43 46% 89%;
+    --primary: 45 54% 54%;
+    --primary-foreground: 228 21% 8%;
+    --secondary: 229 28% 18%;
+    --secondary-foreground: 43 46% 89%;
+    --muted: 229 20% 22%;
+    --muted-foreground: 231 15% 60%;
+    --accent: 45 54% 54%;
+    --accent-foreground: 228 21% 8%;
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 43 46% 98%;
+    --border: 229 22% 22%;
+    --input: 229 22% 22%;
+    --ring: 45 54% 54%;
+  }
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+}
+
+@keyframes chapterai-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@layer utilities {
+  /* Typewriter-scroll canvas. Added to the chapter editor's scroll container
+   * while typewriter mode is on so the caret can be centered vertically even
+   * at the very top or bottom of the document (the 40vh padding gives the
+   * scrollBy math somewhere to go). `scroll-padding-block` tells the browser
+   * to keep a 50% band of headroom when it auto-scrolls to show the caret
+   * (e.g. after IME composition or selection range changes). */
+  .chapterai-typewriter-canvas {
+    padding-top: 40vh;
+    padding-bottom: 40vh;
+    scroll-padding-block: 50%;
+  }
+
+  /* Distraction-free focus mode canvas. Applied to the editor's inner
+   * content wrapper so the prose is centered in a comfortable measure
+   * (720px ≈ 65ch at the current font-size) no matter how wide the
+   * viewport is. Extra vertical padding comes from a sibling wrapper
+   * in ChapterEditor. Body-level `.chapterai-focus` class is applied
+   * simultaneously so global layout chrome (if any) can opt into
+   * hiding itself. */
+  .chapterai-focus-canvas {
+    @apply max-w-[720px] mx-auto;
+  }
+
+
+  /* Scroll-linked reveal (Chrome / Safari recent); graceful degradation without @supports */
+  @supports (animation-timeline: view()) {
+    .reveal-scroll {
+      animation: chapterai-reveal 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+      animation-timeline: view();
+      animation-range: entry 8% cover 32%;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reveal-scroll {
+      animation: none !important;
+      opacity: 1 !important;
+      transform: none !important;
+    }
+  }
+}
+
+/* CSS-only confetti (export page) — no JS canvas */
+@keyframes chapterai-confetti-fall {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(110vh) rotate(560deg);
+    opacity: 0;
+  }
+}
+
+@layer components {
+  .chapterai-confetti {
+    pointer-events: none;
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    overflow: hidden;
+  }
+
+  .chapterai-confetti-piece {
+    position: absolute;
+    top: -16px;
+    width: 8px;
+    height: 12px;
+    border-radius: 1px;
+    opacity: 0;
+    animation: chapterai-confetti-fall 2.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  }
+
+  .chapterai-confetti-piece:nth-child(1) {
+    left: 6%;
+    animation-delay: 0.05s;
+    background: #c9a84c;
+  }
+  .chapterai-confetti-piece:nth-child(2) {
+    left: 14%;
+    animation-delay: 0.15s;
+    background: #e8dcc4;
+  }
+  .chapterai-confetti-piece:nth-child(3) {
+    left: 22%;
+    animation-delay: 0.08s;
+    background: #8b7355;
+  }
+  .chapterai-confetti-piece:nth-child(4) {
+    left: 31%;
+    animation-delay: 0.22s;
+    background: #c9a84c;
+  }
+  .chapterai-confetti-piece:nth-child(5) {
+    left: 38%;
+    animation-delay: 0.12s;
+    background: #f0ead6;
+  }
+  .chapterai-confetti-piece:nth-child(6) {
+    left: 46%;
+    animation-delay: 0.18s;
+    background: #a68b4b;
+  }
+  .chapterai-confetti-piece:nth-child(7) {
+    left: 54%;
+    animation-delay: 0.04s;
+    background: #c9a84c;
+  }
+  .chapterai-confetti-piece:nth-child(8) {
+    left: 62%;
+    animation-delay: 0.25s;
+    background: #6d6148;
+  }
+  .chapterai-confetti-piece:nth-child(9) {
+    left: 70%;
+    animation-delay: 0.1s;
+    background: #e8dcc4;
+  }
+  .chapterai-confetti-piece:nth-child(10) {
+    left: 78%;
+    animation-delay: 0.2s;
+    background: #c9a84c;
+  }
+  .chapterai-confetti-piece:nth-child(11) {
+    left: 86%;
+    animation-delay: 0.14s;
+    background: #9a8b6e;
+  }
+  .chapterai-confetti-piece:nth-child(12) {
+    left: 93%;
+    animation-delay: 0.06s;
+    background: #f0ead6;
+  }
+  .chapterai-confetti-piece:nth-child(13) {
+    left: 11%;
+    animation-delay: 0.28s;
+    background: #c9a84c;
+  }
+  .chapterai-confetti-piece:nth-child(14) {
+    left: 52%;
+    animation-delay: 0.16s;
+    background: #b89a5a;
+  }
+  .chapterai-confetti-piece:nth-child(15) {
+    left: 67%;
+    animation-delay: 0.11s;
+    background: #e8dcc4;
+  }
+  .chapterai-confetti-piece:nth-child(16) {
+    left: 41%;
+    animation-delay: 0.24s;
+    background: #8b7355;
+  }
+  .chapterai-confetti-piece:nth-child(17) {
+    left: 19%;
+    animation-delay: 0.19s;
+    background: #c9a84c;
+  }
+  .chapterai-confetti-piece:nth-child(18) {
+    left: 84%;
+    animation-delay: 0.09s;
+    background: #d4c4a8;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .chapterai-confetti {
+      display: none !important;
+    }
+  }
+
+  .onboarding-illus {
+    animation: onboarding-illus-pulse 3s ease-in-out infinite;
+  }
+
+  .onboarding-illus-sparkle {
+    animation: onboarding-illus-pulse 2.2s ease-in-out infinite;
+  }
+
+  .animate-chapterai-cta {
+    animation: chapterai-cta-pulse 2.4s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .onboarding-illus,
+    .onboarding-illus-sparkle,
+    .animate-chapterai-cta {
+      animation: none !important;
+    }
+  }
+}
+
+@keyframes onboarding-illus-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.88;
+    transform: scale(1.04);
+  }
+}
+
+@keyframes chapterai-cta-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(201, 168, 76, 0.45);
+    transform: translateY(0);
+  }
+  50% {
+    box-shadow: 0 0 36px 8px rgba(201, 168, 76, 0.2);
+    transform: translateY(-2px);
+  }
+}
+
+/* One-shot gold pulse for the save indicator when the user triggers
+ * Cmd/Ctrl+S. Designed to be additive to the indicator's existing text
+ * color and drawn via text-shadow so it works on whichever variant
+ * (saving / dirty / saved / error) is currently rendered. */
+@keyframes chapterai-save-indicator-flash-kf {
+  0% {
+    color: hsl(var(--muted-foreground));
+    text-shadow: 0 0 0 rgba(201, 168, 76, 0);
+  }
+  30% {
+    color: #c9a84c;
+    text-shadow: 0 0 10px rgba(201, 168, 76, 0.55);
+  }
+  100% {
+    color: hsl(var(--muted-foreground));
+    text-shadow: 0 0 0 rgba(201, 168, 76, 0);
+  }
+}
+
+.chapterai-save-indicator-flash {
+  animation: chapterai-save-indicator-flash-kf 300ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chapterai-save-indicator-flash {
+    animation: none !important;
+  }
+}
+
+/* PROMPT 28 — page enter, streaming cursor, approval pop, progress polish */
+@keyframes chapterai-page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.chapterai-page-transition-enter {
+  animation: chapterai-page-enter 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes chapterai-stream-cursor-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.chapterai-stream-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1.1em;
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  background: linear-gradient(to bottom, #c9a84c, #e8dcc4);
+  border-radius: 1px;
+  animation: chapterai-stream-cursor-blink 1s step-end infinite;
+  pointer-events: none;
+  user-select: none;
+}
+
+@keyframes chapterai-approve-pop {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  55% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.chapterai-approve-check {
+  animation: chapterai-approve-pop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes chapterai-editor-glow {
+  0%,
+  100% {
+    box-shadow: inset 0 0 0 0 rgba(201, 168, 76, 0);
+  }
+  50% {
+    box-shadow: inset 0 0 32px 0 rgba(201, 168, 76, 0.12);
+  }
+}
+
+.chapterai-editor-streaming-pulse {
+  animation: chapterai-editor-glow 2s ease-in-out infinite;
+}
+
+.chapterai-btn-primary-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.chapterai-btn-primary-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-120%);
+  background: linear-gradient(
+    105deg,
+    transparent 0%,
+    transparent 38%,
+    rgba(255, 255, 255, 0.18) 50%,
+    transparent 62%,
+    transparent 100%
+  );
+  transition: transform 0.55s ease;
+  pointer-events: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .chapterai-btn-primary-shimmer:hover::after {
+    transform: translateX(120%);
+  }
+}
+
+@keyframes chapterai-generate-btn-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(201, 168, 76, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 28px 5px rgba(201, 168, 76, 0.5);
+  }
+}
+
+.chapterai-generate-chapter-btn:not(:disabled) {
+  animation: chapterai-generate-btn-glow 2.2s ease-in-out infinite;
+}
+
+@keyframes chapterai-overlay-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(201, 168, 76, 0.15);
+  }
+  50% {
+    box-shadow: 0 0 36px 6px rgba(201, 168, 76, 0.35);
+  }
+}
+
+.chapterai-generate-overlay-pulse {
+  animation: chapterai-overlay-pulse 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chapterai-page-transition-enter {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .chapterai-stream-cursor {
+    animation: none !important;
+    opacity: 1 !important;
+  }
+
+  .chapterai-approve-check {
+    animation: none !important;
+  }
+
+  .chapterai-editor-streaming-pulse {
+    animation: none !important;
+  }
+
+  .chapterai-generate-chapter-btn:not(:disabled),
+  .chapterai-generate-overlay-pulse {
+    animation: none !important;
+  }
+
+  .chapterai-btn-primary-shimmer::after {
+    display: none !important;
+  }
+}
+
+/* Codex entity highlight (TipTap CodexHighlight decoration).
+ *
+ * Every decorated span carries `data-codex-entry-id` + `data-codex-entry-type`
+ * plus an inline `--codex-underline` custom property supplied by the
+ * extension (per-entry-type color). The underline is rendered via a
+ * background gradient so we can adjust weight/offset without affecting
+ * the text's own text-decoration (preserves link underlines etc.). */
+.codex-highlight {
+  background-image: linear-gradient(
+    to top,
+    var(--codex-underline, #94a3b8) 0,
+    var(--codex-underline, #94a3b8) 1.5px,
+    transparent 1.5px,
+    transparent 100%
+  );
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  background-position: 0 100%;
+  cursor: help;
+  border-radius: 2px;
+  padding: 0 1px;
+  transition: background-color 120ms ease;
+}
+.codex-highlight:hover {
+  background-color: color-mix(
+    in srgb,
+    var(--codex-underline, #94a3b8) 18%,
+    transparent
+  );
+}
+
+/* Series-scoped entries get a subtly different treatment — a dashed
+ * underline instead of a solid one. Same hue as the type-based underline
+ * so the entry's category is still legible, but experienced series
+ * authors can pick out shared-vs-local entries at a glance. Spec 16.3. */
+.codex-highlight[data-codex-scope="series"],
+.codex-highlight[data-codex-scope="shared"] {
+  background-image: linear-gradient(
+    to right,
+    var(--codex-underline, #94a3b8) 0,
+    var(--codex-underline, #94a3b8) 3px,
+    transparent 3px,
+    transparent 6px
+  );
+  background-repeat: repeat-x;
+  background-size: 6px 1.5px;
+  background-position: 0 100%;
+}
+
+/* Post-hoc slop / banned-phrase scan (TipTap SlopHighlight, Prompt 16) */
+.slop-highlight {
+  background-image: linear-gradient(
+    to top,
+    #f59e0b 0,
+    #f59e0b 1.5px,
+    transparent 1.5px,
+    transparent 100%
+  );
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  background-position: 0 100%;
+  cursor: help;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+.slop-highlight:hover {
+  background-color: color-mix(in srgb, #f59e0b 22%, transparent);
+}
+
+/* SceneBeat (Prompt 9) — TipTap custom atom node.
+ *
+ * The React node view owns most of its styling via Tailwind utilities.
+ * This small CSS block adds:
+ *   1. A pulsing border animation while the beat is streaming prose,
+ *      which would be awkward to express via Tailwind's animation
+ *      utilities (we want an opacity breath on the border specifically).
+ *   2. A base margin reset so the node sits flush with surrounding
+ *      paragraphs instead of getting the editor's `[&_p]:mb-4`
+ *      spacing twice.
+ */
+@keyframes chapterai-scene-beat-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-gold, #d4a574) 40%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-gold, #d4a574) 75%, transparent);
+  }
+}
+
+.scene-beat-streaming {
+  animation: chapterai-scene-beat-pulse 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene-beat-streaming {
+    animation: none !important;
+  }
+}
+
+.scene-beat-prose p {
+  margin: 0;
+}
+
+/* SceneBeat bracket-highlight overlay.
+ *
+ * The beat textarea renders transparent text on top of a visible mirror
+ * <div> that paints bracketed directives in the accent colour. For the
+ * overlay to line up pixel-perfectly with the caret we have to force
+ * identical box-model values on both elements — Tailwind's arbitrary
+ * utilities cover typography but a few low-level rules are easiest to
+ * express here (pseudo-states, cross-element inheritance, etc.).
+ */
+.scene-beat-textarea-wrap {
+  min-height: 2.8rem; /* ~2 lines at 14px / 1.625 */
+}
+
+.scene-beat-mirror {
+  /* Min-height matches the wrap so an empty beat still has a visible
+   * "Describe what happens…" placeholder painted at the correct height. */
+  min-height: 2.8rem;
+  /* `break-words` + `pre-wrap` match the textarea's default word-break
+   * behaviour. Kept here (not Tailwind) so the cascade covers nested
+   * <span> children without extra utility classes on every segment. */
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.scene-beat-textarea {
+  /* Prevent the transparent textarea from ever showing a scrollbar —
+   * the mirror drives the layout height, so the textarea should never
+   * need to scroll. If it did, mirror + textarea would go out of sync
+   * vertically and the caret would drift. */
+  overflow: hidden;
+}
+
+/* Firefox paints a 1px focus ring inside the textarea that shows
+ * through the mirror. Remove it; the wrap's focus-within ring on the
+ * parent node view already indicates focus. */
+.scene-beat-textarea:focus {
+  outline: none;
+}

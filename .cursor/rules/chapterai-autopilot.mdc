@@ -1,0 +1,498 @@
+---
+description: ChapterAI SaaS — stack, structure, schema, AI prompts, styling, APIs; autopilot rules (no clarifying questions).
+alwaysApply: true
+---
+
+# CURSOR AUTOPILOT RULES — AI Book Generation SaaS
+
+# Stack: Next.js 14 (App Router) + Supabase + OpenAI + DALLE-3 + TypeScript + Tailwind CSS
+
+# These rules are non-negotiable. Cursor must NEVER ask clarifying questions.
+
+# Always make a decision and proceed. If ambiguous, pick the most production-ready option.
+
+---
+
+## CORE DIRECTIVE
+
+You are building an AI-powered book generation SaaS platform called "ChapterAI" (or use this as the working title).
+
+You have all the context you need. Make decisions autonomously. Never pause to ask the user for input.
+
+When you encounter something ambiguous, choose the most logical production-grade implementation and document your choice inline with a comment.
+
+---
+
+## TECH STACK — NON-NEGOTIABLE
+
+- **Framework**: Next.js 14 with App Router (TypeScript, strict mode)
+- **Database + Auth + Storage**: Supabase (use @supabase/supabase-js and @supabase/ssr)
+- **AI Text Generation**: OpenAI API — model: gpt-4o for all writing and ideation
+- **Image Generation**: OpenAI DALL-E 3 API — for book covers only
+- **Styling**: Tailwind CSS + shadcn/ui components
+- **Document Compilation**: docx npm package (generates .docx files server-side)
+- **State Management**: Zustand for client state, Supabase Realtime for live updates
+- **Form Handling**: React Hook Form + Zod validation
+- **Streaming**: OpenAI streaming via Vercel AI SDK (useChat, useCompletion)
+- **Payments**: Stripe (subscription-based, free tier + Pro tier)
+- **Deployment target**: Vercel
+
+---
+
+## PROJECT STRUCTURE
+
+Always use this exact file/folder structure. Never deviate:
+
+```
+/app
+  /api
+    /ai
+      /refine-idea/route.ts       — Streams idea refinement conversation
+      /generate-outline/route.ts  — Generates structured book outline
+      /generate-chapter/route.ts  — Streams chapter content
+      /generate-cover/route.ts    — Calls DALL-E 3 for cover image
+      /compile-book/route.ts      — Compiles all chapters into .docx
+    /webhooks
+      /stripe/route.ts
+  /(auth)
+    /login/page.tsx
+    /signup/page.tsx
+    /callback/route.ts
+  /(dashboard)
+    /dashboard/page.tsx           — Lists all user's book projects
+    /projects/[id]/page.tsx       — Main book editor page
+    /projects/[id]/outline/page.tsx
+    /projects/[id]/chapters/[chapterId]/page.tsx
+    /projects/[id]/cover/page.tsx
+    /projects/[id]/export/page.tsx
+  /layout.tsx
+  /page.tsx                       — Landing page
+/components
+  /ui/                            — shadcn/ui components
+  /book/
+    IdeaChat.tsx                  — Idea refinement chat interface
+    OutlineEditor.tsx             — Drag-and-drop outline editing
+    ChapterEditor.tsx             — Rich text chapter editor with AI controls
+    CoverGenerator.tsx            — DALL-E cover generation UI
+    ExportPanel.tsx               — Download + KDP instructions panel
+    ProjectCard.tsx               — Dashboard project preview card
+    ProgressStepper.tsx           — Visual workflow progress tracker
+  /layout/
+    Sidebar.tsx
+    Header.tsx
+    AuthGuard.tsx
+/lib
+  /supabase/
+    client.ts                     — Browser client
+    server.ts                     — Server client (cookies)
+    middleware.ts
+  /openai/
+    client.ts                     — OpenAI client singleton
+    prompts.ts                    — All AI prompt templates
+  /docx/
+    compiler.ts                   — Book-to-.docx compilation logic
+  /stripe/
+    client.ts
+  /utils/
+    cn.ts
+    format.ts
+/hooks
+  useBook.ts
+  useChapter.ts
+  useRealtime.ts
+/types
+  database.types.ts               — Auto-generated Supabase types
+  book.types.ts                   — App-level TypeScript types
+/supabase
+  /migrations/                    — All SQL migration files
+  config.toml
+/middleware.ts                    — Auth route protection
+```
+
+---
+
+## DATABASE SCHEMA
+
+Always create and use exactly this schema. Generate migration files in /supabase/migrations/.
+
+```sql
+-- Users are handled by Supabase Auth (auth.users)
+
+-- User profiles (extends auth.users)
+CREATE TABLE profiles (
+  id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
+  email TEXT NOT NULL,
+  full_name TEXT,
+  avatar_url TEXT,
+  stripe_customer_id TEXT,
+  subscription_tier TEXT DEFAULT 'free' CHECK (subscription_tier IN ('free', 'pro')),
+  books_generated INT DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Book projects
+CREATE TABLE books (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  title TEXT NOT NULL DEFAULT 'Untitled Book',
+  genre TEXT,
+  target_audience TEXT,
+  tone TEXT,
+  raw_idea TEXT,                        -- User's original pitch
+  refined_idea TEXT,                    -- AI-refined concept
+  idea_conversation JSONB DEFAULT '[]', -- Full idea-refinement chat history
+  status TEXT DEFAULT 'idea' CHECK (status IN (
+    'idea', 'refining', 'outlining', 'writing', 'editing', 'cover', 'complete'
+  )),
+  cover_prompt TEXT,                    -- Prompt used to generate cover
+  cover_url TEXT,                       -- Supabase Storage URL
+  kdp_instructions TEXT,                -- Generated KDP publishing guide
+  word_count INT DEFAULT 0,
+  chapter_count INT DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Book outline
+CREATE TABLE outlines (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  book_id UUID REFERENCES books(id) ON DELETE CASCADE NOT NULL UNIQUE,
+  sections JSONB NOT NULL DEFAULT '[]', -- Array of {title, description, chapter_count}
+  approved BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Individual chapters
+CREATE TABLE chapters (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  book_id UUID REFERENCES books(id) ON DELETE CASCADE NOT NULL,
+  chapter_number INT NOT NULL,
+  title TEXT NOT NULL,
+  outline_summary TEXT,                 -- What this chapter should cover
+  content TEXT,                         -- Full generated chapter content (markdown)
+  word_count INT DEFAULT 0,
+  status TEXT DEFAULT 'pending' CHECK (status IN (
+    'pending', 'generating', 'draft', 'edited', 'approved'
+  )),
+  generation_count INT DEFAULT 0,       -- How many times regenerated
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(book_id, chapter_number)
+);
+
+-- Storage: covers bucket
+-- supabase storage create covers (public bucket)
+-- supabase storage create exports (private bucket)
+
+-- Row Level Security
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE books ENABLE ROW LEVEL SECURITY;
+ALTER TABLE outlines ENABLE ROW LEVEL SECURITY;
+ALTER TABLE chapters ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users own their profile" ON profiles FOR ALL USING (auth.uid() = id);
+CREATE POLICY "Users own their books" ON books FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY "Users own their outlines" ON outlines FOR ALL
+  USING (book_id IN (SELECT id FROM books WHERE user_id = auth.uid()));
+CREATE POLICY "Users own their chapters" ON chapters FOR ALL
+  USING (book_id IN (SELECT id FROM books WHERE user_id = auth.uid()));
+```
+
+---
+
+## AI PROMPT TEMPLATES
+
+Store all prompts in /lib/openai/prompts.ts. Use these exact system prompts:
+
+### Idea Refinement
+
+```
+You are a professional book development editor. Your job is to ask focused questions
+to extract the user's full vision for their book. Ask one clarifying question at a time.
+After 4-6 exchanges, summarize the refined idea as a structured brief with:
+- Title (suggested)
+- Genre
+- Target audience
+- Core premise (2-3 sentences)
+- Tone and style
+- Key themes
+- Estimated length (chapters and word count)
+Signal completion by returning a JSON block wrapped in <REFINED_IDEA>...</REFINED_IDEA>.
+```
+
+### Outline Generation
+
+```
+You are a bestselling author and structural editor. Given the book brief below,
+generate a detailed chapter-by-chapter outline. Each chapter must have a title
+and a 2-3 sentence description of what it covers. Return ONLY valid JSON in this format:
+{"chapters": [{"number": 1, "title": "...", "description": "..."}]}
+Generate between 8-15 chapters appropriate to the genre and scope.
+```
+
+### Chapter Writing
+
+```
+You are a skilled author writing in the specified genre and tone. 
+Write Chapter {number}: {title} in full. 
+Use the chapter outline as your guide but write naturally and engagingly.
+Target {word_count} words. Use markdown formatting (## for subheadings if needed).
+Maintain consistency with the book's tone, themes, and any character/world details provided.
+Do not summarize—write the full, complete chapter as it would appear in the published book.
+```
+
+### Cover Image Prompt
+
+```
+Generate a DALL-E 3 prompt for a professional book cover for the following book:
+Title: {title}, Genre: {genre}, Premise: {premise}, Tone: {tone}.
+The prompt should describe a compelling, commercially viable cover design.
+Return only the image generation prompt, nothing else.
+```
+
+---
+
+## COMPONENT BEHAVIOR RULES
+
+### IdeaChat.tsx
+
+- Uses Vercel AI SDK `useChat` hook
+- Streams responses in real-time
+- Detects `<REFINED_IDEA>` tag in stream and auto-advances to outline stage
+- Saves conversation history to `books.idea_conversation` on each turn
+- Has a "Skip refinement, I know my idea" button that shows a form
+
+### OutlineEditor.tsx
+
+- Renders chapters as draggable cards using @dnd-kit/sortable
+- Each card is inline-editable (click title or description to edit)
+- "Add Chapter" button appends a new blank chapter
+- "Regenerate Outline" button calls the outline API with current refined idea
+- Large "Approve Outline & Start Writing" CTA button
+- On approve: sets outline.approved = true, creates all chapter rows in DB with status 'pending'
+
+### ChapterEditor.tsx
+
+- Split view: left panel shows chapter list, right panel shows current chapter
+- Uses a lightweight rich text editor (use TipTap)
+- Toolbar: Bold, Italic, Heading, — and AI controls: "Regenerate", "Expand", "Rewrite Tone"
+- Chapter status indicator (pending → generating → draft → edited). No per-chapter approval step.
+- Auto-saves to Supabase every 30 seconds and on blur
+- Any chapter with content (draft/edited) is automatically ready for export and used as prior-chapter context
+- Word count shown per chapter and running total
+
+### CoverGenerator.tsx
+
+- Shows the book title and genre prominently
+- "Generate Cover" button triggers DALL-E 3 call
+- Shows generation spinner with a fun message ("Designing your cover…")
+- Displays result as a large preview (book mockup frame around the image)
+- "Regenerate" and "Download Cover" buttons
+- Saves cover_url to books table
+
+### ExportPanel.tsx
+
+- Shows all chapters with checkmarks when all have content (draft/edited)
+- "Compile & Download Book" button → calls /api/compile-book
+- Downloads a .docx file with: cover page, table of contents, all chapters formatted
+- Below the button: a formatted, step-by-step KDP publishing guide (static content, well-designed)
+- KDP guide covers: account setup, manuscript formatting requirements, cover specs, pricing, categories, keywords
+
+---
+
+## STYLING RULES
+
+- **Aesthetic**: Dark editorial — deep navy/charcoal backgrounds, warm cream/gold typography, refined and literary feeling. Think high-end publishing house meets modern SaaS.
+- **Font pairing**: Use `Playfair Display` for headings (serif, literary), `DM Sans` for body/UI
+- Import both from Google Fonts in layout.tsx
+- **Primary color**: `#C9A84C` (gold) for CTAs and accents
+- **Background**: `#0F1117` (near black) with `#1A1E2E` for cards/panels
+- **Text**: `#F0EAD6` (cream) for primary, `#8B8FA8` for secondary/muted
+- All shadcn/ui components must be themed to match — update globals.css CSS variables accordingly
+- Tailwind config must extend theme with these custom colors
+
+---
+
+## API ROUTE RULES
+
+- Every route in /app/api/ must validate the user session via Supabase before proceeding
+- If no valid session: return 401 immediately
+- All OpenAI calls must be wrapped in try/catch with proper error responses
+- Use streaming (ReadableStream + TransformStream) for all text generation routes
+- Rate limit: free tier = 1 book at a time, 3 total books; pro = unlimited
+- Never expose API keys — all AI calls happen server-side only
+- Log token usage to a separate `api_usage` table for billing/monitoring
+
+---
+
+## ENVIRONMENT VARIABLES
+
+The following .env.local variables must be used. Never hardcode values:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+OPENAI_API_KEY=
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
+NEXT_PUBLIC_STRIPE_PRO_PRICE_ID=
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+```
+
+---
+
+## SUPABASE REALTIME
+
+Enable Realtime on: `books`, `chapters` tables.
+
+In ChapterEditor, subscribe to chapter updates so status changes reflect instantly.
+
+In the dashboard, subscribe to books so word count and status update live.
+
+Use the `useRealtime` hook in /hooks/useRealtime.ts for all subscriptions.
+
+---
+
+## ERROR HANDLING
+
+- All async operations must use try/catch
+- Show toast notifications (use sonner) for all errors and successes
+- If chapter generation fails mid-stream, set chapter status back to 'pending' and show retry button
+- If DALL-E fails, show fallback UI with a placeholder cover and "Try again" option
+- Never show raw error messages to users — always use friendly copy
+
+---
+
+## AUTHENTICATION FLOW
+
+- Supabase Auth with email/password + Google OAuth
+- Protected routes: anything under /(dashboard) requires active session
+- middleware.ts intercepts unauthenticated requests and redirects to /login
+- On signup: auto-create profile row via Supabase trigger (create this trigger in migrations)
+- On login: redirect to /dashboard
+
+---
+
+## STRIPE SUBSCRIPTION
+
+- Free tier: up to 3 books, max 10 chapters per book
+- Pro tier ($19/month): unlimited books, unlimited chapters, priority generation
+- Show upgrade prompt when free tier limits are hit
+- Webhook handler updates profiles.subscription_tier on subscription changes
+- Use Stripe Customer Portal for subscription management
+
+---
+
+## KDP PUBLISHING INSTRUCTIONS (static content for ExportPanel)
+
+Generate this content in the ExportPanel component as formatted JSX:
+
+1. Create your KDP account at kdp.amazon.com
+2. Click "Create" → "Kindle eBook" or "Paperback"
+3. Enter your book title, subtitle, author name, and description
+4. Set language, publication date, and add relevant keywords (7 allowed)
+5. Choose 2 categories that best match your book
+6. Upload your manuscript (.docx is accepted — upload the file you just downloaded)
+7. Use KDP's previewer to review formatting
+8. Upload your cover image (minimum 2560 x 1600px — use the cover you generated)
+9. Set your pricing (70% royalty available for books priced $2.99–$9.99)
+10. Select territories (choose "worldwide" unless you have regional restrictions)
+11. Click "Publish" — your book goes live within 24-72 hours
+
+---
+
+## BOOK COMPILATION (.docx format)
+
+In /lib/docx/compiler.ts, the compiled book must include:
+
+1. Cover page: Book title (large), Author name, Genre
+2. Table of contents: Auto-generated with chapter titles
+3. Each chapter: Chapter number + title as heading, full content, page break after
+4. Back matter: "Published with ChapterAI" line (can be removed on Pro)
+
+Use the `docx` npm package. All text from chapters is stored as markdown — convert to docx Paragraphs properly (handle ##, **bold**, *italic*, line breaks).
+
+---
+
+## CODE QUALITY RULES
+
+- TypeScript strict mode — no `any` types ever
+- All database queries use generated types from database.types.ts
+- All components under 200 lines — split if larger
+- No inline styles — Tailwind classes only
+- All API routes return typed responses
+- Use server components by default, client components only when interactivity is needed (mark with 'use client')
+- Zod schemas for all form inputs and API request bodies
+- No console.log in production — use a logger utility
+
+---
+
+## PACKAGE.JSON DEPENDENCIES
+
+Install exactly these packages on project init:
+
+```json
+{
+  "dependencies": {
+    "next": "14.2.0",
+    "@supabase/supabase-js": "^2.43.0",
+    "@supabase/ssr": "^0.3.0",
+    "openai": "^4.52.0",
+    "ai": "^3.2.0",
+    "@tiptap/react": "^2.4.0",
+    "@tiptap/starter-kit": "^2.4.0",
+    "@dnd-kit/core": "^6.1.0",
+    "@dnd-kit/sortable": "^8.0.0",
+    "docx": "^8.5.0",
+    "zustand": "^4.5.0",
+    "zod": "^3.23.0",
+    "react-hook-form": "^7.52.0",
+    "@hookform/resolvers": "^3.9.0",
+    "sonner": "^1.5.0",
+    "stripe": "^16.0.0",
+    "tailwind-merge": "^2.4.0",
+    "clsx": "^2.1.0",
+    "lucide-react": "^0.400.0",
+    "date-fns": "^3.6.0"
+  }
+}
+```
+
+---
+
+## WHAT CURSOR MUST NEVER DO
+
+- Never ask the user what color scheme, font, or layout to use — these are defined above
+- Never ask which database tables to create — they are defined above
+- Never ask about file structure — it is defined above
+- Never suggest alternative libraries — the stack is locked
+- Never skip TypeScript types
+- Never leave placeholder TODO comments without implementing them in the same pass
+- Never generate a component without wiring it to real Supabase data
+- Never hardcode API keys
+- Never create files outside the defined project structure
+
+---
+
+## BUILD ORDER (for Cursor to follow sequentially)
+
+1. Project scaffold + install all dependencies
+2. Supabase migrations (all tables, RLS policies, triggers)
+3. Auth system (login, signup, middleware, profile creation)
+4. Database types generation setup
+5. Supabase client utilities (client.ts, server.ts)
+6. OpenAI client + all prompt templates
+7. Landing page
+8. Dashboard page + ProjectCard component
+9. New book flow + IdeaChat component + /api/ai/refine-idea
+10. Outline generation + OutlineEditor + /api/ai/generate-outline
+11. Chapter generation loop + ChapterEditor + /api/ai/generate-chapter
+12. Cover generation + CoverGenerator + /api/ai/generate-cover
+13. Book compiler + ExportPanel + /api/compile-book
+14. Stripe integration + subscription gating
+15. Realtime subscriptions + useRealtime hook
+16. Full QA pass — fix types, test all flows end to end

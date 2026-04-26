@@ -1,0 +1,5 @@
+# ChapterAI — Supabase project configuration.
+# For full local stack, run `supabase init` and merge with your team defaults.
+
+[api]
+port = 54321

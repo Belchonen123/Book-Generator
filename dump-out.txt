@@ -1,0 +1,16 @@
+﻿node.exe : C:\Users\belch\Cursor Project\Book Generator Saas 2\scripts\dump-prompt-once.mts:2
+At C:\Program Files\nodejs\npx.ps1:29 char:3
++   & $NODE_EXE $NPX_CLI_JS $args
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (C:\Users\belch\...ompt-once.mts:2:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+import { getChapterSystemPrompt } from "../lib/openai/prompts.ts";
+         ^
+SyntaxError: The requested module '../lib/openai/prompts.ts' does not provide an export named 'getChapterSystemPrompt'
+    at ModuleJob._instantiate (node:internal/modules/esm/module_job:226:21)
+    at async ModuleJob.run (node:internal/modules/esm/module_job:335:5)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:665:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+
+Node.js v22.22.0

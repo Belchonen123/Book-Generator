@@ -1,0 +1,23 @@
+---
+description: Chapter editor AI generation controls, prompt inputs, and regression coverage
+globs: components/book/chapter-editor/**/*.{ts,tsx},app/api/ai/**/*.ts,lib/ai/**/*.ts,lib/utils/schemas.ts,tests/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Chapter Editor AI Generation
+
+When changing chapter editor AI flows, preserve these guarantees:
+
+- Stop must always work mid-generation. If a chapter is generating, the Stop control must be visible, visually active, and enabled even when the rest of the toolbar is disabled.
+- Stop must cancel both layers. Cancel the active stream reader and abort the fetch controller; then unlock the editor and reset local generating state immediately.
+- Author-entered instruction fields must affect prompts. Steering notes, Expand outline prompt text, Codex include selections, and chapter outline edits must be carried into the final AI request, not only saved to the database.
+- Prompt-template paths need hard fallbacks. If a resolved template omits critical generated context such as codex or author instructions, append or include those blocks elsewhere in the final prompt/user message.
+- Treat user instructions as high priority. Text typed into steering/prompt boxes should be labeled as mandatory/highest-priority unless it conflicts with established continuity or safety.
+- Do not rely on UI copy alone. If the UI says a field guides AI, verify the API route and prompt assembly consume it.
+- Add regression tests for every fixed AI control bug. Prefer focused tests for prompt builders, stream cancellation, toolbar wiring, and request schemas.
+
+Before finishing changes in this area, run focused Vitest coverage for the touched flow, for example:
+
+```bash
+npx vitest run "tests/components/EditorToolbar.test.tsx" "tests/unit/chapter-generation-cancel.test.ts"
+```

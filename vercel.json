@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/heal-stuck-chapters",
+      "schedule": "*/15 * * * *"
+    }
+  ]
+}
