@@ -1,0 +1,7 @@
+.env
+.env.*
+.next
+node_modules
+logs
+CODE_REVIEW_SINGLE_FILE_*.md
+*.log
