@@ -2,9 +2,10 @@
 
 import type { Message } from "ai";
 import { useChat } from "ai/react";
-import { ArrowRight, Loader2, Send, Sparkles } from "lucide-react";
+import { ArrowRight, Loader2, Mic, Send, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
+  type KeyboardEvent as ReactKeyboardEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -50,6 +51,50 @@ type EditableBrief = {
 };
 
 type EditableFieldKey = keyof EditableBrief;
+
+type SpeechRecognitionAlternativeLike = {
+  transcript: string;
+};
+
+type SpeechRecognitionResultLike = {
+  readonly isFinal: boolean;
+  readonly length: number;
+  item(index: number): SpeechRecognitionAlternativeLike;
+  [index: number]: SpeechRecognitionAlternativeLike;
+};
+
+type SpeechRecognitionEventLike = Event & {
+  readonly resultIndex: number;
+  readonly results: {
+    readonly length: number;
+    item(index: number): SpeechRecognitionResultLike;
+    [index: number]: SpeechRecognitionResultLike;
+  };
+};
+
+type SpeechRecognitionErrorEventLike = Event & {
+  readonly error?: string;
+};
+
+type SpeechRecognitionLike = EventTarget & {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onend: (() => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  abort: () => void;
+  start: () => void;
+  stop: () => void;
+};
+
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
+
+type SpeechRecognitionWindow = Window &
+  typeof globalThis & {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+  };
 
 const EMPTY_EDITABLE: EditableBrief = {
   title: "",
@@ -375,11 +420,17 @@ export function IdeaChat({
 }: IdeaChatProps) {
   const router = useRouter();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const chatFormRef = useRef<HTMLFormElement>(null);
+  const chatTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const speechRecognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const speechBaseInputRef = useRef("");
   const [skipOpen, setSkipOpen] = useState(false);
   const [skipText, setSkipText] = useState("");
   const [outlineBusy, setOutlineBusy] = useState(false);
   const [bookType, setBookType] = useState<BookTypeDb>(initialBookType);
   const [bookTypePending, startBookTypeTransition] = useTransition();
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const [isListening, setIsListening] = useState(false);
 
   const handleBookTypeChange = useCallback(
     (next: BookTypeDb) => {
@@ -435,7 +486,7 @@ export function IdeaChat({
     });
   }, []);
 
-  const { messages, input, handleInputChange, handleSubmit, isLoading, stop } = useChat({
+  const { messages, input, setInput, handleInputChange, handleSubmit, isLoading, stop } = useChat({
     api: "/api/ai/refine-idea",
     initialMessages,
     experimental_prepareRequestBody: ({ messages: chatMessages }) => {
@@ -470,6 +521,100 @@ export function IdeaChat({
       }
     },
   });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const speechWindow = window as SpeechRecognitionWindow;
+    setSpeechSupported(Boolean(speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition));
+    return () => {
+      speechRecognitionRef.current?.abort();
+      speechRecognitionRef.current = null;
+    };
+  }, []);
+
+  const appendSpeechTranscript = useCallback(
+    (transcript: string) => {
+      const clean = transcript.trim();
+      const base = speechBaseInputRef.current.trimEnd();
+      const next = clean ? `${base}${base ? " " : ""}${clean}` : base;
+      setInput(next);
+    },
+    [setInput],
+  );
+
+  const toggleSpeechInput = useCallback(() => {
+    if (isListening) {
+      speechRecognitionRef.current?.stop();
+      setIsListening(false);
+      chatTextareaRef.current?.focus();
+      return;
+    }
+
+    if (typeof window === "undefined") return;
+    const speechWindow = window as SpeechRecognitionWindow;
+    const Recognition =
+      speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
+
+    if (!Recognition) {
+      setSpeechSupported(false);
+      toast.error("Speech to text is not supported in this browser.");
+      return;
+    }
+
+    const recognition = new Recognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = navigator.language || "en-US";
+    speechBaseInputRef.current = input;
+
+    recognition.onresult = (event) => {
+      let transcript = "";
+      for (let i = 0; i < event.results.length; i += 1) {
+        transcript += event.results[i]?.[0]?.transcript ?? "";
+      }
+      appendSpeechTranscript(transcript);
+    };
+
+    recognition.onerror = (event) => {
+      setIsListening(false);
+      speechRecognitionRef.current = null;
+      if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+        toast.error("Microphone access was blocked. Allow microphone access to dictate.");
+      } else if (event.error !== "no-speech" && event.error !== "aborted") {
+        toast.error("Speech to text stopped. Try the mic again.");
+      }
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+      if (speechRecognitionRef.current === recognition) {
+        speechRecognitionRef.current = null;
+      }
+    };
+
+    try {
+      speechRecognitionRef.current = recognition;
+      recognition.start();
+      setIsListening(true);
+      chatTextareaRef.current?.focus();
+    } catch {
+      speechRecognitionRef.current = null;
+      setIsListening(false);
+      toast.error("Could not start speech to text.");
+    }
+  }, [appendSpeechTranscript, input, isListening]);
+
+  const handleChatTextareaKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
+      if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) {
+        return;
+      }
+      event.preventDefault();
+      if (!input.trim() || isLoading) return;
+      chatFormRef.current?.requestSubmit();
+    },
+    [input, isLoading],
+  );
 
   useEffect(() => {
     const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
@@ -986,16 +1131,21 @@ export function IdeaChat({
       </div>
 
       <form
+        ref={chatFormRef}
         onSubmit={(e) => {
           e.preventDefault();
           if (!input.trim() || isLoading) return;
+          speechRecognitionRef.current?.stop();
+          setIsListening(false);
           void handleSubmit(e);
         }}
         className="mt-4 flex gap-2 border-t border-border/50 pt-4"
       >
         <textarea
+          ref={chatTextareaRef}
           value={input}
           onChange={handleInputChange}
+          onKeyDown={handleChatTextareaKeyDown}
           placeholder="Reply to the editor…"
           rows={2}
           disabled={isLoading}
@@ -1003,10 +1153,34 @@ export function IdeaChat({
         />
         <div className="flex flex-col gap-2">
           <Button
+            type="button"
+            variant={isListening ? "default" : "outline"}
+            disabled={isLoading || !speechSupported}
+            onClick={toggleSpeechInput}
+            className={cn(
+              "min-h-[48px] px-4",
+              isListening
+                ? "bg-emerald-500 text-editorial-bg hover:bg-emerald-400"
+                : "border-border/70 bg-background/70 text-editorial-cream hover:bg-editorial-cream/10",
+            )}
+            aria-label={isListening ? "Stop speech to text" : "Start speech to text"}
+            aria-pressed={isListening}
+            title={
+              speechSupported
+                ? isListening
+                  ? "Stop dictation"
+                  : "Dictate with speech to text"
+                : "Speech to text is not supported in this browser"
+            }
+          >
+            <Mic className="h-5 w-5" aria-hidden />
+          </Button>
+          <Button
             type="submit"
             disabled={isLoading || !input.trim()}
-            className="h-full min-h-[48px] bg-gold px-4 text-editorial-bg hover:bg-gold/90"
+            className="min-h-[48px] bg-gold px-4 text-editorial-bg hover:bg-gold/90"
             aria-label="Send message"
+            title="Send message"
           >
             {isLoading ? (
               <Loader2 className="h-5 w-5 animate-spin" aria-hidden />

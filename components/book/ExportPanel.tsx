@@ -29,7 +29,6 @@ import type { ChapterStatusDb } from "@/types/database.types";
 export type { ExportChapterRow, ExportPanelProps };
 
 function isPublishableStatus(status: ChapterStatusDb): boolean {
-  // Any chapter that has been written counts — no manual approval needed.
   return status === "draft" || status === "edited" || status === "approved";
 }
 
@@ -60,7 +59,7 @@ export function ExportPanel({
   );
 
   const shareHref = useMemo(() => {
-    const t = `Just wrote my book '${title}' with @ChapterAI — check it out!`;
+    const t = `Just wrote my book '${title}' with @ChapterAI - check it out!`;
     return `https://twitter.com/intent/tweet?text=${encodeURIComponent(t)}`;
   }, [title]);
 
@@ -68,54 +67,12 @@ export function ExportPanel({
     <div className="relative px-4 pb-16 pt-8 text-editorial-cream sm:px-6">
       {hasPublishableChapter ? <ExportConfetti /> : null}
 
-      <section
-        id="kdp-pack"
-        className="relative z-10 mx-auto mt-6 max-w-3xl rounded-xl border border-gold/25 bg-gold/5 px-5 py-6 sm:px-6"
-      >
-        <p className="text-xs font-semibold uppercase tracking-widest text-gold/90">
-          Amazon KDP
-        </p>
-        <h2 className="mt-2 font-serif text-xl text-editorial-cream sm:text-2xl">
-          KDP listing pack (ZIP) — separate from your manuscript
-        </h2>
-        <p className="mt-2 text-sm leading-relaxed text-editorial-muted">
-          Download a ZIP with <strong className="text-editorial-cream">AI-assisted</strong> title and
-          subtitle ideas, book description, seven keywords, a two-sentence{" "}
-          <strong className="text-editorial-cream">About the author</strong> blurb,{" "}
-          <strong className="text-editorial-cream">back-of-book</strong> copy for paperbacks, category
-          hints, plus a step-by-step{" "}
-          <strong className="text-editorial-cream">KDP signup and publish walkthrough</strong>. Your
-          manuscript still comes from <strong className="text-editorial-cream">Compile &amp; Download</strong>{" "}
-          below (when chapters are ready).
-        </p>
-        <button
-          type="button"
-          onClick={() => void downloadKdpPack()}
-          disabled={kdpPackBusy}
-          className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-gold/50 bg-editorial-bg/60 px-5 text-sm font-semibold text-gold shadow-sm transition hover:bg-editorial-bg/80 disabled:opacity-60 sm:w-auto"
-        >
-          {kdpPackBusy ? (
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-          ) : (
-            <FileArchive className="h-4 w-4" aria-hidden />
-          )}
-          {kdpPackBusy ? "Building pack…" : "Download KDP listing pack (.zip)"}
-        </button>
-      </section>
-
-      <AudioExportSection
-        bookId={bookId}
-        isPro={isPro}
-        canGenerate={hasPublishableChapter}
-        chapters={chapters}
-      />
-
       {chapters.length === 0 ? (
         <div className="relative z-10 mx-auto max-w-xl rounded-2xl border border-dashed border-gold/35 bg-card/50 px-6 py-12 text-center">
           <p className="text-xs font-semibold uppercase tracking-widest text-gold">Export</p>
           <h1 className="mt-2 font-serif text-2xl text-editorial-cream sm:text-3xl">No chapters yet</h1>
           <p className="mt-3 text-sm leading-relaxed text-editorial-muted">
-            Generate an outline first—then you&apos;ll see chapters here. Once at least one chapter
+            Generate an outline first, then you&apos;ll see chapters here. Once at least one chapter
             has been written, you can compile your manuscript.
           </p>
           <div className="mt-8 flex flex-col gap-2 sm:flex-row sm:justify-center">
@@ -186,7 +143,7 @@ export function ExportPanel({
               ) : (
                 <Download className="h-5 w-5" aria-hidden />
               )}
-              {compileBusy ? "Compiling…" : "Compile & Download Book"}
+              {compileBusy ? "Compiling..." : "Compile & Download Book"}
             </button>
             <button
               type="button"
@@ -235,6 +192,47 @@ export function ExportPanel({
           ) : null}
         </>
       )}
+
+      <section
+        id="kdp-pack"
+        className="relative z-10 mx-auto mt-14 max-w-3xl rounded-xl border border-gold/25 bg-gold/5 px-5 py-6 sm:px-6"
+      >
+        <p className="text-xs font-semibold uppercase tracking-widest text-gold/90">
+          Amazon KDP
+        </p>
+        <h2 className="mt-2 font-serif text-xl text-editorial-cream sm:text-2xl">
+          KDP listing pack (ZIP) - separate from your manuscript
+        </h2>
+        <p className="mt-2 text-sm leading-relaxed text-editorial-muted">
+          Download a ZIP with <strong className="text-editorial-cream">AI-assisted</strong> title and
+          subtitle ideas, book description, seven keywords, a two-sentence{" "}
+          <strong className="text-editorial-cream">About the author</strong> blurb,{" "}
+          <strong className="text-editorial-cream">back-of-book</strong> copy for paperbacks, category
+          hints, plus a step-by-step{" "}
+          <strong className="text-editorial-cream">KDP signup and publish walkthrough</strong>.
+        </p>
+        <button
+          type="button"
+          onClick={() => void downloadKdpPack()}
+          disabled={kdpPackBusy}
+          className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-gold/50 bg-editorial-bg/60 px-5 text-sm font-semibold text-gold shadow-sm transition hover:bg-editorial-bg/80 disabled:opacity-60 sm:w-auto"
+        >
+          {kdpPackBusy ? (
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+          ) : (
+            <FileArchive className="h-4 w-4" aria-hidden />
+          )}
+          {kdpPackBusy ? "Building pack..." : "Download KDP listing pack (.zip)"}
+        </button>
+      </section>
+
+      <AudioExportSection
+        bookId={bookId}
+        isPro={isPro}
+        canGenerate={hasPublishableChapter}
+        chapters={chapters}
+        defaultCollapsed
+      />
 
       <footer className="relative z-10 mx-auto mt-12 max-w-3xl text-center">
         <Link

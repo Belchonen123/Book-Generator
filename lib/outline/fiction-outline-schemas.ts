@@ -2,6 +2,224 @@ import { z } from "zod";
 
 const MAX_FICTION_CHAPTER_STRUCTS = 40;
 
+function firstNonEmptyString(...values: unknown[]): string {
+  for (const v of values) {
+    if (typeof v === "string") {
+      const t = v.trim();
+      if (t.length > 0 && !/^tbd\b/i.test(t)) return t;
+    }
+  }
+  return "";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value != null && typeof value === "object" && !Array.isArray(value);
+}
+
+function pickString(c: Record<string, unknown>, keys: string[]): string {
+  return firstNonEmptyString(...keys.map((key) => c[key]));
+}
+
+function pickStringFromAny(sources: Record<string, unknown>[], keys: string[]): string {
+  for (const source of sources) {
+    const value = pickString(source, keys);
+    if (value) return value;
+  }
+  return "";
+}
+
+function fallbackDescriptionFromOutlineFields(c: Record<string, unknown>): string {
+  const nestedSources = [
+    c,
+    isRecord(c.outline) ? c.outline : null,
+    isRecord(c.structure) ? c.structure : null,
+    isRecord(c.beats) ? c.beats : null,
+  ].filter(isRecord);
+
+  const emotionalContract = pickStringFromAny(nestedSources, [
+    "emotional_contract",
+    "emotionalContract",
+    "reader_emotional_contract",
+    "readerEmotionalContract",
+  ]);
+  const opening = pickStringFromAny(nestedSources, [
+    "opening_psychological_move",
+    "openingPsychologicalMove",
+    "opening_move",
+    "openingMove",
+    "opening_hook_move",
+    "openingHookMove",
+    "opening_hook",
+    "openingHook",
+    "first_beat",
+    "firstBeat",
+  ]);
+  const want = pickStringFromAny(nestedSources, [
+    "who_wants_what",
+    "whoWantsWhat",
+    "chapter_goal",
+    "chapterGoal",
+    "goal",
+    "wants",
+    "desire",
+  ]);
+  const obstacle = pickStringFromAny(nestedSources, [
+    "what_stops_them",
+    "whatStopsThem",
+    "obstacle",
+    "conflict",
+    "antagonistic_force",
+    "antagonisticForce",
+  ]);
+  const whatHappens = pickStringFromAny(nestedSources, [
+    "what_happens",
+    "whatHappens",
+    "chapter_events",
+    "chapterEvents",
+    "main_events",
+    "mainEvents",
+    "scene_events",
+    "sceneEvents",
+  ]);
+  const failureOrCost = pickStringFromAny(nestedSources, [
+    "try_fail_cost",
+    "tryFailCost",
+    "failure_or_cost",
+    "failureOrCost",
+    "how_it_fails",
+    "howItFails",
+    "cost",
+    "consequence",
+    "complication",
+    "stakes",
+  ]);
+  const whatChanges = pickStringFromAny(nestedSources, [
+    "what_changes",
+    "whatChanges",
+    "irreversible_change",
+    "irreversibleChange",
+    "turning_point",
+    "turningPoint",
+    "character_moment",
+    "characterMoment",
+  ]);
+  const signature = pickStringFromAny(nestedSources, [
+    "signature_chapter_detail",
+    "signatureChapterDetail",
+    "signature_detail",
+    "signatureDetail",
+    "signature_example",
+    "signatureExample",
+    "unique_detail",
+    "uniqueDetail",
+  ]);
+  const finalBeat = pickStringFromAny(nestedSources, [
+    "chapter_ends_with",
+    "chapterEndsWith",
+    "chapter_end",
+    "chapterEnd",
+    "final_beat",
+    "finalBeat",
+    "ending",
+    "ending_beat",
+    "endingBeat",
+    "closing_beat",
+    "closingBeat",
+  ]);
+  const nextProblem = pickStringFromAny(nestedSources, [
+    "ending_opens_what",
+    "endingOpensWhat",
+    "question_the_chapter_opens",
+    "questionTheChapterOpens",
+    "question_chapter_opens",
+    "questionChapterOpens",
+    "question_that_pulls_forward",
+    "questionThatPullsForward",
+    "question_pulls_next",
+    "questionPullsNext",
+    "bridges_to_next",
+    "bridgesToNext",
+    "next_question",
+    "nextQuestion",
+    "chapter_question",
+    "chapterQuestion",
+    "hook_to_next",
+    "hookToNext",
+  ]);
+
+  const parts = [
+    emotionalContract ? `Reader emotional contract: ${emotionalContract}` : "",
+    opening ? `Opening move: ${opening}` : "",
+    want ? `Chapter want: ${want}` : "",
+    obstacle ? `Obstacle: ${obstacle}` : "",
+    whatHappens ? `What happens: ${whatHappens}` : "",
+    failureOrCost ? `Failure, cost, or complication: ${failureOrCost}` : "",
+    whatChanges ? `What changes: ${whatChanges}` : "",
+    signature ? `Signature detail: ${signature}` : "",
+    finalBeat ? `Final beat: ${finalBeat}` : "",
+    nextProblem ? `Next problem or question: ${nextProblem}` : "",
+  ].filter(Boolean);
+  return parts.length >= 2 ? parts.join(" ") : "";
+}
+
+function pickArrayStrings(c: Record<string, unknown>, keys: string[]): string[] {
+  for (const key of keys) {
+    const v = c[key];
+    if (Array.isArray(v)) {
+      const arr = v
+        .map((x) => {
+          if (typeof x === "string") return x.trim();
+          if (isRecord(x)) return firstNonEmptyString(x.name, x.title, x.character);
+          return String(x ?? "").trim();
+        })
+        .filter(Boolean);
+      if (arr.length > 0) return arr;
+    }
+    if (typeof v === "string") {
+      const arr = v
+        .split(/[,;]|\n/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (arr.length > 0) return arr;
+    }
+  }
+  return [];
+}
+
+function coerceChapterNumber(c: Record<string, unknown>, index: number): number {
+  const rawNum =
+    c.number ??
+    c.chapter_number ??
+    c.chapterNumber ??
+    c.chapter_num ??
+    c.chapterNum ??
+    c.chapter ??
+    c.ch ??
+    c.index ??
+    c.order;
+
+  if (typeof rawNum === "number" && Number.isFinite(rawNum)) {
+    return Math.max(1, Math.trunc(rawNum));
+  }
+
+  const p = parseInt(String(rawNum ?? "").replace(/[^\d-]/g, ""), 10);
+  return Number.isFinite(p) && p > 0 ? p : index + 1;
+}
+
+function coerceTension(c: Record<string, unknown>): number {
+  const tv = c.tension_level ?? c.tensionLevel ?? c.tension ?? c.pressure_level ?? c.pressureLevel;
+  if (typeof tv === "number" && Number.isFinite(tv)) {
+    return Math.min(10, Math.max(1, Math.round(tv)));
+  }
+  if (typeof tv === "string" && tv.trim() !== "") {
+    const t = parseInt(tv.replace(/[^\d-]/g, ""), 10);
+    if (Number.isFinite(t)) {
+      return Math.min(10, Math.max(1, t));
+    }
+  }
+  return 5;
+}
+
 /**
  * Normalizes model drift before Zod: alternate roots (`outline`, `data`),
  * stringly-typed numbers, empty titles/descriptions, and oversized arrays.
@@ -9,11 +227,18 @@ const MAX_FICTION_CHAPTER_STRUCTS = 40;
  * the original `input` if nothing to fix.
  */
 export function coerceFictionStructuralPayload(input: unknown): unknown {
+  if (Array.isArray(input)) {
+    input = { chapters: input };
+  }
+
   if (input == null || typeof input !== "object" || Array.isArray(input)) {
     return input;
   }
   const root = input as Record<string, unknown>;
   let chapters: unknown = root.chapters;
+  if (!Array.isArray(chapters) && Array.isArray(root.outline)) {
+    chapters = root.outline;
+  }
   if (!Array.isArray(chapters) && root.outline && typeof root.outline === "object") {
     chapters = (root.outline as Record<string, unknown>).chapters;
   }
@@ -22,6 +247,15 @@ export function coerceFictionStructuralPayload(input: unknown): unknown {
   }
   if (!Array.isArray(chapters) && root.result && typeof root.result === "object") {
     chapters = (root.result as Record<string, unknown>).chapters;
+  }
+  if (!Array.isArray(chapters) && root.book_outline && typeof root.book_outline === "object") {
+    chapters = (root.book_outline as Record<string, unknown>).chapters;
+  }
+  if (!Array.isArray(chapters) && root.bookOutline && typeof root.bookOutline === "object") {
+    chapters = (root.bookOutline as Record<string, unknown>).chapters;
+  }
+  if (!Array.isArray(chapters) && Array.isArray(root.sections)) {
+    chapters = root.sections;
   }
   if (!Array.isArray(chapters)) {
     return input;
@@ -32,8 +266,8 @@ export function coerceFictionStructuralPayload(input: unknown): unknown {
     if (ch == null || typeof ch !== "object" || Array.isArray(ch)) {
       return {
         number: i + 1,
-        title: `Chapter ${i + 1}`,
-        description: "TBD",
+        title: "",
+        description: "",
         tension_level: 5,
         opening_psychological_move: "",
         signature_chapter_detail: "",
@@ -43,50 +277,99 @@ export function coerceFictionStructuralPayload(input: unknown): unknown {
       };
     }
     const c = ch as Record<string, unknown>;
-    const rawNum = c.number;
-    let num: number;
-    if (typeof rawNum === "number" && Number.isFinite(rawNum)) {
-      num = Math.trunc(rawNum);
-    } else {
-      const p = parseInt(String(rawNum ?? "").replace(/[^\d-]/g, ""), 10);
-      num = Number.isFinite(p) && p > 0 ? p : i + 1;
-    }
-    const title = String(c.title ?? "").trim() || `Chapter ${i + 1}`;
-    const description = String(c.description ?? "").trim() || "TBD";
-    let tv = c.tension_level;
-    let tension = 5;
-    if (typeof tv === "number" && Number.isFinite(tv)) {
-      tension = Math.min(10, Math.max(1, Math.round(tv)));
-    } else if (typeof tv === "string" && tv.trim() !== "") {
-      const t = parseInt(tv.replace(/[^\d-]/g, ""), 10);
-      if (Number.isFinite(t)) {
-        tension = Math.min(10, Math.max(1, t));
-      }
-    }
-    const str = (k: string) => String(c[k] ?? "").trim();
-    const arrStr = (k: string): string[] => {
-      const v = c[k];
-      if (Array.isArray(v)) {
-        return v.map((x) => String(x).trim()).filter(Boolean);
-      }
-      if (typeof v === "string") {
-        return v
-          .split(/[,;]|\n/)
-          .map((s) => s.trim())
-          .filter(Boolean);
-      }
-      return [];
-    };
+    const num = coerceChapterNumber(c, i);
+    const title =
+      pickString(c, [
+        "title",
+        "working_title",
+        "workingTitle",
+        "chapter_title",
+        "chapterTitle",
+        "chapter_name",
+        "chapterName",
+        "name",
+        "heading",
+      ]) || `Chapter ${num}`;
+    const description =
+      firstNonEmptyString(
+        c.description,
+        c.chapter_description,
+        c.chapterDescription,
+        c.chapter_outline,
+        c.chapterOutline,
+        c.outline,
+        c.summary,
+        c.chapter_summary,
+        c.chapterSummary,
+        c.synopsis,
+        c.plot,
+        c.scene,
+        c.what_happens,
+        c.whatHappens,
+        c.events,
+        c.main_events,
+        c.mainEvents,
+        c.beat_summary,
+        c.beatSummary,
+        c.scene_summary,
+        c.sceneSummary,
+        c.narrative,
+        c.body,
+      ) || fallbackDescriptionFromOutlineFields(c);
+
     return {
       number: num,
       title,
       description,
-      tension_level: tension,
-      opening_psychological_move: str("opening_psychological_move"),
-      signature_chapter_detail: str("signature_chapter_detail"),
-      ending_opens_what: str("ending_opens_what"),
-      chapter_ends_with: str("chapter_ends_with"),
-      characters_introduced: arrStr("characters_introduced"),
+      tension_level: coerceTension(c),
+      opening_psychological_move: pickString(c, [
+        "opening_psychological_move",
+        "openingPsychologicalMove",
+        "opening_move",
+        "openingMove",
+        "opening_hook_move",
+        "openingHookMove",
+      ]),
+      signature_chapter_detail: pickString(c, [
+        "signature_chapter_detail",
+        "signatureChapterDetail",
+        "signature_detail",
+        "signatureDetail",
+        "signature_example",
+        "signatureExample",
+      ]),
+      ending_opens_what: pickString(c, [
+        "ending_opens_what",
+        "endingOpensWhat",
+        "question_the_chapter_opens",
+        "questionTheChapterOpens",
+        "question_chapter_opens",
+        "questionChapterOpens",
+        "question_that_pulls_forward",
+        "questionThatPullsForward",
+        "bridges_to_next",
+        "bridgesToNext",
+        "next_question",
+        "nextQuestion",
+      ]),
+      chapter_ends_with: pickString(c, [
+        "chapter_ends_with",
+        "chapterEndsWith",
+        "chapter_end",
+        "chapterEnd",
+        "final_beat",
+        "finalBeat",
+        "ending",
+        "ending_beat",
+        "endingBeat",
+      ]),
+      characters_introduced: pickArrayStrings(c, [
+        "characters_introduced",
+        "charactersIntroduced",
+        "new_characters",
+        "newCharacters",
+        "characters",
+      ]),
     };
   });
   return { chapters: out };

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Download, Loader2, Mic, Play, Square } from "@/lib/lucide-icons";
+import { ChevronDown, Download, Loader2, Mic, Play, Square } from "@/lib/lucide-icons";
 
 import type { ExportChapterRow } from "@/components/book/export/export-types";
 import { ProUpgradeModal } from "@/components/subscription/ProUpgradeModal";
@@ -64,6 +64,7 @@ type AudioExportSectionProps = {
   /** Chapters exist and at least one is draft/edited/approved (same idea as compile). */
   canGenerate: boolean;
   chapters: ExportChapterRow[];
+  defaultCollapsed?: boolean;
 };
 
 function chapterOkForAudio(c: ExportChapterRow): boolean {
@@ -98,6 +99,7 @@ export function AudioExportSection({
   isPro,
   canGenerate,
   chapters,
+  defaultCollapsed = false,
 }: AudioExportSectionProps) {
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [voices, setVoices] = useState<PremadeVoice[] | null>(null);
@@ -426,14 +428,20 @@ export function AudioExportSection({
 
   if (!isPro) {
     return (
-      <section
-        className="relative z-10 mx-auto mt-6 max-w-3xl rounded-xl border border-violet-500/25 bg-violet-500/5 px-5 py-6 sm:px-6"
+      <details
+        open={!defaultCollapsed}
+        className="group relative z-10 mx-auto mt-6 max-w-3xl rounded-xl border border-violet-500/25 bg-violet-500/5 px-5 py-6 sm:px-6"
         aria-label="Audiobook export (Pro)"
       >
-        <p className="text-xs font-semibold uppercase tracking-widest text-violet-300/90">Audiobook</p>
-        <h2 className="mt-2 font-serif text-xl text-editorial-cream sm:text-2xl">
-          ElevenLabs audiobook export
-        </h2>
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 marker:content-none [&::-webkit-details-marker]:hidden">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-violet-300/90">Audiobook</p>
+            <h2 className="mt-2 font-serif text-xl text-editorial-cream sm:text-2xl">
+              ElevenLabs audiobook export
+            </h2>
+          </div>
+          <ChevronDown className="h-5 w-5 text-violet-200 transition group-open:rotate-180" aria-hidden />
+        </summary>
         <p className="mt-2 text-sm leading-relaxed text-editorial-muted">
           Generate a full audiobook: one MP3 per chapter, then a ZIP with ACX-style notes. Pro
           only.
@@ -451,19 +459,25 @@ export function AudioExportSection({
           title="Audiobook export is Pro"
           description="Pro unlocks AI audiobook generation with professional ElevenLabs voices, packaged for delivery."
         />
-      </section>
+      </details>
     );
   }
 
   return (
-    <section
-      className="relative z-10 mx-auto mt-6 max-w-3xl rounded-xl border border-violet-500/30 bg-violet-950/20 px-5 py-6 sm:px-6"
+    <details
+      open={!defaultCollapsed}
+      className="group relative z-10 mx-auto mt-6 max-w-3xl rounded-xl border border-violet-500/30 bg-violet-950/20 px-5 py-6 sm:px-6"
       aria-label="Audiobook export"
     >
-      <p className="text-xs font-semibold uppercase tracking-widest text-violet-300/90">Audiobook</p>
-      <h2 className="mt-2 font-serif text-xl text-editorial-cream sm:text-2xl">
-        Generate an audiobook (ElevenLabs)
-      </h2>
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 marker:content-none [&::-webkit-details-marker]:hidden">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-widest text-violet-300/90">Audiobook</p>
+          <h2 className="mt-2 font-serif text-xl text-editorial-cream sm:text-2xl">
+            Generate an audiobook (ElevenLabs)
+          </h2>
+        </div>
+        <ChevronDown className="h-5 w-5 text-violet-200 transition group-open:rotate-180" aria-hidden />
+      </summary>
       <p className="mt-2 text-sm leading-relaxed text-editorial-muted">
         <strong className="text-editorial-cream/90">Nothing is generated</strong> until you press
         Generate — we don&apos;t start credits or full-book audio in the background. MP3s are
@@ -731,6 +745,6 @@ export function AudioExportSection({
         </div>
       ) : null}
 
-    </section>
+    </details>
   );
 }

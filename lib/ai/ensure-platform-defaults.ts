@@ -18,8 +18,9 @@ const DEFAULT_TEMPLATE_NAMES: Record<DefaultTemplateTaskId, string> = {
 /**
  * Reconcile platform prompt defaults against in-repo defaults.
  *
- * For each task, this UPSERTs the platform row and updates `template_text`
- * + `updated_at` so existing environments don't remain on stale defaults.
+ * Supabase/PostgREST cannot target this table's partial platform-default
+ * unique index via `onConflict`, so use an explicit read followed by update
+ * or insert. That keeps older environments from logging 42P10 on startup.
  */
 export async function ensurePlatformDefaults(
   supabase: SupabaseClient<Database>,
@@ -30,23 +31,46 @@ export async function ensurePlatformDefaults(
     const templateText = DEFAULT_TEMPLATES[taskId];
     const name = DEFAULT_TEMPLATE_NAMES[taskId];
 
-    const { error } = await supabase.from("prompt_templates").upsert(
-      {
-        user_id: null,
-        project_id: null,
-        task_id: taskId,
-        name,
-        template_text: templateText,
-        is_default: true,
-        updated_at: now,
-      },
-      { onConflict: "task_id" },
-    );
+    const { data: existing, error: readError } = await supabase
+      .from("prompt_templates")
+      .select("id")
+      .eq("task_id", taskId)
+      .eq("is_default", true)
+      .is("user_id", null)
+      .is("project_id", null)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (readError) {
+      console.error("[prompt-defaults] failed to read", { taskId, error: readError });
+      continue;
+    }
+
+    const { error } = existing
+      ? await supabase
+          .from("prompt_templates")
+          .update({
+            name,
+            template_text: templateText,
+            updated_at: now,
+          })
+          .eq("id", existing.id)
+      : await supabase.from("prompt_templates").insert({
+          user_id: null,
+          project_id: null,
+          task_id: taskId,
+          name,
+          template_text: templateText,
+          is_default: true,
+          updated_at: now,
+        });
 
     if (error) {
       console.error("[prompt-defaults] failed to reconcile", { taskId, error });
       continue;
     }
+
     console.info("[prompt-defaults] reconciled platform default", { taskId });
   }
 }

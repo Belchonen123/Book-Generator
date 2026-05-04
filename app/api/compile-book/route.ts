@@ -17,7 +17,7 @@ function downloadBasename(title: string | null | undefined): string {
   return `${base}.docx`;
 }
 
-export async function POST(request: Request) {
+async function compileBookResponse(bookId: string, trimSize?: string) {
   try {
     const supabase = await createClient();
     const {
@@ -29,21 +29,17 @@ export async function POST(request: Request) {
       return apiJsonError("Please sign in to continue.", ApiErrorCode.UNAUTHORIZED, 401);
     }
 
-    let json: unknown;
-    try {
-      json = await request.json();
-    } catch {
-      return apiJsonError("Invalid JSON body.", ApiErrorCode.VALIDATION_ERROR, 400);
-    }
-
-    const parsed = CompileRequestSchema.safeParse(json);
+    const parsed = CompileRequestSchema.safeParse({
+      bookId,
+      ...(trimSize ? { trimSize } : {}),
+    });
     if (!parsed.success) {
       return apiJsonError("Invalid request.", ApiErrorCode.VALIDATION_ERROR, 400);
     }
 
-    const { bookId, trimSize } = parsed.data;
+    const { bookId: parsedBookId, trimSize: parsedTrimSize } = parsed.data;
 
-    const denied = await requireBookOwnedByUser(supabase, bookId, user.id);
+    const denied = await requireBookOwnedByUser(supabase, parsedBookId, user.id);
     if (denied) {
       return denied;
     }
@@ -51,7 +47,7 @@ export async function POST(request: Request) {
     const { data: book, error: bookError } = await supabase
       .from("books")
       .select("id, user_id, title")
-      .eq("id", bookId)
+      .eq("id", parsedBookId)
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -61,7 +57,7 @@ export async function POST(request: Request) {
 
     let docxBuffer: Buffer;
     try {
-      docxBuffer = await compileBookToDocx(bookId, user.id, { trimSize });
+      docxBuffer = await compileBookToDocx(parsedBookId, user.id, { trimSize: parsedTrimSize });
     } catch (e) {
       logServerError("compile-book.compilation", e);
       const message = e instanceof Error ? e.message : "";
@@ -75,7 +71,7 @@ export async function POST(request: Request) {
       );
     }
 
-    await trackEvent(user, "book_compiled", bookId);
+    await trackEvent(user, "book_compiled", parsedBookId);
 
     const filename = downloadBasename(book.title);
     return new NextResponse(new Uint8Array(docxBuffer), {
@@ -94,4 +90,28 @@ export async function POST(request: Request) {
       500,
     );
   }
+}
+
+export async function GET(request: Request) {
+  const url = new URL(request.url);
+  return compileBookResponse(
+    url.searchParams.get("bookId") ?? "",
+    url.searchParams.get("trimSize") ?? undefined,
+  );
+}
+
+export async function POST(request: Request) {
+  let json: unknown;
+  try {
+    json = await request.json();
+  } catch {
+    return apiJsonError("Invalid JSON body.", ApiErrorCode.VALIDATION_ERROR, 400);
+  }
+
+  const parsed = CompileRequestSchema.safeParse(json);
+  if (!parsed.success) {
+    return apiJsonError("Invalid request.", ApiErrorCode.VALIDATION_ERROR, 400);
+  }
+
+  return compileBookResponse(parsed.data.bookId, parsed.data.trimSize);
 }

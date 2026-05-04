@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight, Loader2, Sparkles } from "lucide-react";
+import { ChevronRight, Download, Loader2, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -42,6 +42,8 @@ function displayPremise(refinedIdea: Json | null): string {
 export type CoverGeneratorProps = {
   bookId: string;
   bookTitle: string;
+  bookSubtitle: string | null;
+  authorDisplayName: string | null;
   genre: string | null;
   refinedIdea: Json | null;
   tone: string | null;
@@ -52,6 +54,8 @@ export type CoverGeneratorProps = {
 export function CoverGenerator({
   bookId,
   bookTitle,
+  bookSubtitle,
+  authorDisplayName,
   genre,
   refinedIdea,
   tone,
@@ -66,6 +70,7 @@ export function CoverGenerator({
   const [msgIndex, setMsgIndex] = useState(0);
   const [continueBusy, setContinueBusy] = useState(false);
   const [uploadBusy, setUploadBusy] = useState(false);
+  const [downloadBusy, setDownloadBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -89,7 +94,12 @@ export function CoverGenerator({
       const res = await fetch("/api/ai/generate-cover", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookId }),
+        body: JSON.stringify({
+          bookId,
+          title: bookTitle,
+          subtitle: bookSubtitle,
+          authorDisplayName,
+        }),
       });
       const data = (await res.json().catch(() => null)) as {
         coverUrl?: string;
@@ -109,7 +119,7 @@ export function CoverGenerator({
     } finally {
       setLoading(false);
     }
-  }, [bookId, router]);
+  }, [authorDisplayName, bookId, bookSubtitle, bookTitle, router]);
 
   const onOwnCover = useCallback(async (file: File) => {
     const okType = file.type === "image/png" || file.type === "image/jpeg";
@@ -192,12 +202,51 @@ export function CoverGenerator({
     }
   }, [bookId, router]);
 
+  const downloadCover = useCallback(async () => {
+    if (!coverUrl) return;
+    setDownloadBusy(true);
+    try {
+      const res = await fetch(coverUrl);
+      if (!res.ok) {
+        throw new Error("Could not download cover.");
+      }
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const ext = blob.type.includes("svg") ? "svg" : blob.type.includes("jpeg") ? "jpg" : "png";
+      const safeTitle = bookTitle
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "")
+        .slice(0, 80) || "cover";
+      const a = document.createElement("a");
+      a.href = objectUrl;
+      a.download = `${safeTitle}-cover.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not download cover.");
+    } finally {
+      setDownloadBusy(false);
+    }
+  }, [bookTitle, coverUrl]);
+
   const premise = displayPremise(refinedIdea);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
       <header className="space-y-2 border-b border-border/60 pb-6">
         <h1 className="font-serif text-3xl text-gold">{bookTitle}</h1>
+        {bookSubtitle?.trim() || authorDisplayName?.trim() ? (
+          <div className="space-y-1 text-sm text-editorial-cream/90">
+            {bookSubtitle?.trim() ? <p>{bookSubtitle}</p> : null}
+            {authorDisplayName?.trim() ? (
+              <p className="text-editorial-muted">by {authorDisplayName}</p>
+            ) : null}
+          </div>
+        ) : null}
         <p className="text-sm text-editorial-muted">
           <span className="font-medium text-editorial-cream">Genre:</span>{" "}
           {genre?.trim() || "—"}
@@ -237,7 +286,7 @@ export function CoverGenerator({
           <div className="flex w-full flex-col items-center gap-6">
             <div className="w-full max-w-md overflow-hidden rounded-lg border border-border/60 bg-black shadow-xl">
               <p className="border-b border-border/50 bg-card/60 px-3 py-2 text-center text-xs text-editorial-muted">
-                Same image file you&apos;ll upload to KDP — flat cover, not a 3D mockup
+                Flat KDP front cover preview with title, subtitle, and author baked in
               </p>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -263,8 +312,8 @@ export function CoverGenerator({
               <p className="text-center text-xs text-editorial-muted">
                 Edit the <span className="text-editorial-cream">title</span>,{" "}
                 <span className="text-editorial-cream">subtitle</span>, or{" "}
-                <span className="text-editorial-cream">author by-line</span> on the right —
-                they&apos;ll be baked into the image on your next regenerate.
+                <span className="text-editorial-cream">author by-line</span> on the right,
+                save, then regenerate to bake them into a flat upload-ready cover.
               </p>
               <div className="flex flex-wrap items-center justify-center gap-3">
                 <Button
@@ -275,6 +324,20 @@ export function CoverGenerator({
                   onClick={() => void runGenerate()}
                 >
                   Regenerate
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-border/70 text-editorial-cream hover:bg-card"
+                  disabled={downloadBusy || !coverUrl}
+                  onClick={() => void downloadCover()}
+                >
+                  {downloadBusy ? (
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                  ) : (
+                    <Download className="h-4 w-4" aria-hidden />
+                  )}
+                  Download cover
                 </Button>
               </div>
             </div>

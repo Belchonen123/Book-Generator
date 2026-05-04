@@ -29,6 +29,7 @@ import {
   upsertOutlineSections,
 } from "@/lib/outline/generate-outline-two-pass";
 import { normalizeFictionStructuralSections } from "@/lib/outline/normalize-fiction-sections";
+import { coerceNonFictionOutlinePayload } from "@/lib/outline/nonfiction-outline-coerce";
 import type { OutlineSectionPayload } from "@/lib/outline/section-payload";
 export type { OutlineSectionPayload };
 import {
@@ -463,11 +464,23 @@ export async function POST(request: Request) {
       variables: context.variables,
       fallbackPrompt: context.systemPrompt,
     });
-    const systemPrompt = resolvedPrompt.systemPrompt;
-    const missingCriticalVars = missingRequiredVariables(
-      resolvedPrompt.active.templateText,
-      CRITICAL_VARIABLES_BY_TASK["generate-outline"],
-    );
+    const useRouteNativeOutlinePrompt = resolvedPrompt.active.source === "platform";
+    const systemPrompt = useRouteNativeOutlinePrompt
+      ? context.systemPrompt
+      : resolvedPrompt.systemPrompt;
+    if (useRouteNativeOutlinePrompt) {
+      console.info("[prompt-template] using route-native outline prompt over platform default", {
+        taskId: "generate-outline",
+        bookType,
+        templateId: resolvedPrompt.active.id,
+      });
+    }
+    const missingCriticalVars = useRouteNativeOutlinePrompt
+      ? []
+      : missingRequiredVariables(
+          resolvedPrompt.active.templateText,
+          CRITICAL_VARIABLES_BY_TASK["generate-outline"],
+        );
     if (missingCriticalVars.length > 0) {
       console.warn("[prompt-template] critical variables missing", {
         taskId: "generate-outline",
@@ -646,9 +659,15 @@ export async function POST(request: Request) {
           422,
         );
       }
-      const zResult = outlineNonFictionResponseSchema.safeParse(obj);
+      const coercedNf = coerceNonFictionOutlinePayload(obj);
+      let zResult = outlineNonFictionResponseSchema.safeParse(coercedNf);
       if (!zResult.success) {
-        logServerError("generate-outline.parse-zod", zResult.error);
+        zResult = outlineNonFictionResponseSchema.safeParse(obj);
+      }
+      if (!zResult.success) {
+        logServerError("generate-outline.parse-zod", zResult.error, {
+          details: { phase: "non-fiction-outline" },
+        });
         await rollbackRefiningStatus();
         return apiJsonError(
           "Could not parse outline from the model.",

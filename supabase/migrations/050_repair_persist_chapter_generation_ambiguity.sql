@@ -1,5 +1,6 @@
--- Atomic chapter content + generation_count + book word total in one transaction.
--- See app/api/ai/generate-chapter route onFinal.
+-- Idempotent repair: older function bodies can fail with
+-- "column reference generation_count is ambiguous" because the returned table
+-- column shares a name with public.chapters.generation_count.
 
 create or replace function public.persist_chapter_generation(
   p_chapter_id uuid,

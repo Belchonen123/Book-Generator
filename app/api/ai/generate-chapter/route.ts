@@ -67,6 +67,77 @@ function encodeDataCodexNoAutoMatchHint(): Uint8Array {
 
 type RevertToPendingResult = { ok: true } | { ok: false; error: unknown };
 
+/**
+ * PostgREST / Postgres errors from `persist_chapter_generation` — never leak raw
+ * internals in production; the route always logs the full `persistError` object.
+ */
+function userFacingPersistChapterError(err: {
+  message?: string;
+  code?: string;
+  details?: string | null;
+  hint?: string | null;
+}): string {
+  const raw = `${err.message ?? ""} ${err.details ?? ""} ${err.hint ?? ""}`.toLowerCase();
+  const code = String(err.code ?? "").toLowerCase();
+
+  /* PostgREST: missing RPC / schema cache. Postgres: undefined_function */
+  if (
+    code === "pgrst202" ||
+    code === "42883" ||
+    code === "42p01" ||
+    raw.includes("could not find the function") ||
+    raw.includes("unknown function") ||
+    (raw.includes("persist_chapter_generation") && raw.includes("does not exist")) ||
+    (raw.includes("schema cache") && raw.includes("function"))
+  ) {
+    return "Save failed: the database is missing `persist_chapter_generation`. In Supabase → SQL Editor, run `supabase/migrations/040_persist_chapter_generation.sql` from this repo, then try again.";
+  }
+
+  if (
+    raw.includes("permission denied for function") ||
+    raw.includes("permission denied for routine") ||
+    code === "42501"
+  ) {
+    return "Save failed: your role cannot execute `persist_chapter_generation`. In SQL Editor, run `supabase/migrations/049_repair_persist_chapter_generation_grant.sql` (or the GRANT at the end of `040_…`), then try again.";
+  }
+
+  if (
+    raw.includes("not authenticated") ||
+    raw.includes("jwt expired") ||
+    raw.includes("invalid jwt") ||
+    (raw.includes("jwt") && raw.includes("missing")) ||
+    code === "pgrst301"
+  ) {
+    return "Save failed: your session was not accepted by the database. Refresh the page, sign in again, then regenerate.";
+  }
+
+  if (raw.includes("forbidden") || raw.includes("not owned")) {
+    return "Save was rejected for this book or chapter. Refresh and confirm you still have access.";
+  }
+
+  if (raw.includes("chapter not found")) {
+    return "That chapter was not found when saving. Refresh the chapter list and try again.";
+  }
+
+  if (raw.includes("row-level security") || raw.includes("violates row-level security")) {
+    return "Save failed due to row-level security on `chapters`. The RPC should run as SECURITY DEFINER — re-run migration `040_persist_chapter_generation.sql` so the function definition matches the repo.";
+  }
+
+  if (
+    raw.includes("numeric field overflow") ||
+    raw.includes("out of range for type integer") ||
+    raw.includes("invalid input syntax for type integer")
+  ) {
+    return "Save failed: word count or another numeric field was out of range. Try again; if it persists, shorten the chapter text.";
+  }
+
+  if (raw.includes("canceling statement due to statement timeout") || raw.includes("statement timeout")) {
+    return "Save failed because the database timed out. Try again in a moment; if it keeps happening, check Supabase project load or connection pooler settings.";
+  }
+
+  return "Save failed in the database. In Supabase → Logs → Postgres (or API), check the error for this moment. Usual fixes: run `040_persist_chapter_generation.sql`, then `049_repair_persist_chapter_generation_grant.sql`, sign out and back in, then regenerate.";
+}
+
 function estimateTokensFromText(text: string): number {
   return Math.max(1, Math.ceil(text.length / 4));
 }
@@ -75,6 +146,12 @@ function countWords(text: string): number {
   const t = text.trim();
   if (!t) return 0;
   return t.split(/\s+/).filter(Boolean).length;
+}
+
+/** `persist_chapter_generation.p_word_count` is Postgres `int` (int4). */
+function clampWordCountForRpc(n: number): number {
+  const w = Math.floor(Number.isFinite(n) ? n : 0);
+  return Math.min(2_147_483_647, Math.max(0, w));
 }
 
 function inferChapterTargetWords(genre: string | null): number {
@@ -711,8 +788,7 @@ export async function POST(request: Request) {
 
     const revertChapterToPending = async (): Promise<RevertToPendingResult> => {
       try {
-        const sb = await createClient();
-        const { error } = await sb
+        const { error } = await supabase
           .from("chapters")
           .update({ status: "pending" })
           .eq("id", chapterId)
@@ -763,15 +839,61 @@ export async function POST(request: Request) {
     };
 
     /**
+     * After model tokens were streamed, a silent `close()` makes the client think
+     * generation succeeded while the DB was reverted — refresh then wipes the editor.
+     * Always send a terminal stream error before closing on persist-phase failure.
+     */
+    const closeStreamAfterPersistFailure = async (
+      controller: ReadableStreamDefaultController<Uint8Array>,
+      message: string,
+    ): Promise<void> => {
+      await revertGenerationAndHint();
+      try {
+        controller.enqueue(
+          encoder.encode(formatStreamPart("error", message) + "\n"),
+        );
+      } catch {
+        /* stream may already be closed or errored */
+      }
+      try {
+        controller.close();
+      } catch {
+        /* ignore */
+      }
+    };
+
+    /**
      * Start the HTTP response immediately so the client does not sit in "pending"
      * with no headers until the model provider accepts the connection (which can take long
      * and triggers "Failed to fetch" on some networks / proxies / dev setups).
      */
     const piped = new ReadableStream<Uint8Array>({
       start(controller) {
+        let streamClosed = false;
+        const safeEnqueue = (chunk: Uint8Array): void => {
+          if (streamClosed) {
+            return;
+          }
+          try {
+            controller.enqueue(chunk);
+          } catch {
+            streamClosed = true;
+          }
+        };
+        const safeClose = (): void => {
+          if (streamClosed) {
+            return;
+          }
+          streamClosed = true;
+          try {
+            controller.close();
+          } catch {
+            /* stream may already be closed */
+          }
+        };
         streamNotifyController = controller;
         if (shouldNotifyCodexNoAutoMatch) {
-          controller.enqueue(encodeDataCodexNoAutoMatchHint());
+          safeEnqueue(encodeDataCodexNoAutoMatchHint());
         }
         void (async () => {
           let modelUsedForUsage = "";
@@ -800,7 +922,7 @@ export async function POST(request: Request) {
                   break;
                 }
                 if (value) {
-                  controller.enqueue(value);
+                  safeEnqueue(value);
                 }
               }
 
@@ -808,17 +930,23 @@ export async function POST(request: Request) {
               modelUsedForUsage = completion.model_used;
               let contentPersisted = false;
               try {
-                const sb = await createClient();
+                /* Reuse the route's Supabase client (request-scoped JWT). A fresh
+                 * `createClient()` inside this long-running stream can omit the
+                 * session when `cookies()` is no longer readable, so `auth.uid()`
+                 * in the RPC becomes null and persist fails. */
                 const trimmed = completion.text.trim();
                 if (!trimmed) {
-                  await revertGenerationAndHint();
-                  controller.close();
+                  await closeStreamAfterPersistFailure(
+                    controller,
+                    "The model returned no usable text, so the chapter was not saved.",
+                  );
                   return;
                 }
 
                 const words = countWords(trimmed);
+                const wordCountForRpc = clampWordCountForRpc(words);
 
-                const { data: freshChapter, error: freshErr } = await sb
+                const { data: freshChapter, error: freshErr } = await supabase
                   .from("chapters")
                   .select("generation_count")
                   .eq("id", chapterId)
@@ -826,8 +954,10 @@ export async function POST(request: Request) {
                   .single();
 
                   if (freshErr || !freshChapter) {
-                    await revertGenerationAndHint();
-                    controller.close();
+                    await closeStreamAfterPersistFailure(
+                      controller,
+                      "Could not verify the chapter before saving. Nothing was written.",
+                    );
                     return;
                   }
 
@@ -841,7 +971,7 @@ export async function POST(request: Request) {
                       ? "regenerate"
                       : "generation";
 
-                  const snap = await snapshotChapter(sb, {
+                  const snap = await snapshotChapter(supabase, {
                     chapterId,
                     userId: user.id,
                     source: snapshotSource,
@@ -851,37 +981,113 @@ export async function POST(request: Request) {
                       "generate-chapter.snapshot",
                       new Error(snap.error ?? "snapshot failed"),
                     );
-                    await revertGenerationAndHint();
-                    controller.close();
+                    await closeStreamAfterPersistFailure(
+                      controller,
+                      "Could not save a pre-generation backup, so the chapter was not updated.",
+                    );
                     return;
                   }
 
-                  const { data: persistRows, error: persistError } = await sb.rpc(
+                  const { data: persistRows, error: persistError } = await supabase.rpc(
                     "persist_chapter_generation",
                     {
                       p_chapter_id: chapterId,
                       p_book_id: bookId,
                       p_content: trimmed,
-                      p_word_count: words,
+                      p_word_count: wordCountForRpc,
                       p_source: snapshotSource,
                     },
                   );
 
+                  let persistRow = persistRows?.[0] ?? null;
                   if (persistError) {
                     logServerError("generate-chapter.persist_chapter_generation", persistError);
-                    await revertGenerationAndHint();
-                    controller.close();
-                    return;
+                    const rawPersistError = `${persistError.message ?? ""} ${
+                      persistError.details ?? ""
+                    }`.toLowerCase();
+                    if (
+                      persistError.code === "42702" &&
+                      rawPersistError.includes("generation_count") &&
+                      rawPersistError.includes("ambiguous")
+                    ) {
+                      const nextGenerationCount = labelNext;
+                      const timestamp = new Date().toISOString();
+                      const { data: updatedChapter, error: fallbackChapterError } =
+                        await supabase
+                          .from("chapters")
+                          .update({
+                            generation_count: nextGenerationCount,
+                            content: trimmed,
+                            status: "draft",
+                            word_count: wordCountForRpc,
+                            updated_at: timestamp,
+                          })
+                          .eq("id", chapterId)
+                          .eq("book_id", bookId)
+                          .select("id")
+                          .single();
+
+                      if (fallbackChapterError || !updatedChapter) {
+                        logServerError(
+                          "generate-chapter.persist-fallback.chapter",
+                          fallbackChapterError ?? new Error("Fallback chapter update returned no row"),
+                        );
+                        await closeStreamAfterPersistFailure(
+                          controller,
+                          userFacingPersistChapterError(persistError),
+                        );
+                        return;
+                      }
+
+                      const { data: wordRows, error: wordRowsError } = await supabase
+                        .from("chapters")
+                        .select("word_count")
+                        .eq("book_id", bookId);
+
+                      let bookTotalWords = wordCountForRpc;
+                      if (wordRowsError) {
+                        logServerError("generate-chapter.persist-fallback.word-total", wordRowsError);
+                      } else {
+                        bookTotalWords = (wordRows ?? []).reduce(
+                          (total, row) => total + (row.word_count ?? 0),
+                          0,
+                        );
+                        const { error: fallbackBookError } = await supabase
+                          .from("books")
+                          .update({ word_count: bookTotalWords, updated_at: timestamp })
+                          .eq("id", bookId)
+                          .eq("user_id", user.id);
+
+                        if (fallbackBookError) {
+                          logServerError("generate-chapter.persist-fallback.book", fallbackBookError);
+                        }
+                      }
+
+                      console.warn(
+                        "[generate-chapter.persist_chapter_generation] used fallback for stale RPC; run migration 050_repair_persist_chapter_generation_ambiguity.sql",
+                      );
+                      persistRow = {
+                        generation_count: nextGenerationCount,
+                        book_total_words: bookTotalWords,
+                      };
+                    } else {
+                      await closeStreamAfterPersistFailure(
+                        controller,
+                        userFacingPersistChapterError(persistError),
+                      );
+                      return;
+                    }
                   }
 
-                  const persistRow = persistRows?.[0];
                   if (!persistRow) {
                     logServerError(
                       "generate-chapter.persist_chapter_generation",
                       new Error("RPC returned no row"),
                     );
-                    await revertGenerationAndHint();
-                    controller.close();
+                    await closeStreamAfterPersistFailure(
+                      controller,
+                      "Save did not complete (database returned no row). Nothing was written.",
+                    );
                     return;
                   }
 
@@ -893,7 +1099,7 @@ export async function POST(request: Request) {
                     estimateTokensFromText(userMessage) +
                     estimateTokensFromText(trimmed);
 
-                  await sb.from("api_usage").insert({
+                  await supabase.from("api_usage").insert({
                     user_id: user.id,
                     route: "/api/ai/generate-chapter",
                     tokens_used: tokensUsed,
@@ -913,7 +1119,7 @@ export async function POST(request: Request) {
                    * regressions later. Self-gated on series membership;
                    * never throws (logger swallows its own errors). */
                   if (book.series_id) {
-                    void logSeriesAiGeneration(sb, {
+                    void logSeriesAiGeneration(supabase, {
                       userId: user.id,
                       seriesId: book.series_id,
                       bookId,
@@ -946,7 +1152,7 @@ export async function POST(request: Request) {
                    * don't race on the just-written DB row. Detached so
                    * a slow AI call never blocks the author's response. */
                   void runContinuityCheckForChapter(
-                    sb,
+                    supabase,
                     { bookId, chapterId, userId: user.id },
                     { chapterContentOverride: trimmed },
                   ).catch((err) => {
@@ -955,39 +1161,29 @@ export async function POST(request: Request) {
               } catch (e) {
                 logServerError("generate-chapter.onFinal-persist", e);
                 if (!contentPersisted) {
-                  await revertGenerationAndHint();
+                  await closeStreamAfterPersistFailure(
+                    controller,
+                    e instanceof Error && e.message
+                      ? `Could not finish saving: ${e.message}`
+                      : "Could not finish saving the chapter. Nothing was written.",
+                  );
+                  return;
                 }
               }
-              controller.close();
+              safeClose();
             } catch (pipeErr) {
               logServerError("generate-chapter.stream-pipe", pipeErr);
               await revertGenerationAndHint();
-              try {
-                controller.enqueue(encodeStreamError(pipeErr));
-              } catch {
-                /* controller may be closed */
-              }
-              try {
-                controller.close();
-              } catch {
-                /* ignore */
-              }
+              safeEnqueue(encodeStreamError(pipeErr));
+              safeClose();
             } finally {
               reader.releaseLock();
             }
           } catch (e) {
             logServerError("generate-chapter.model-router", e);
             await revertGenerationAndHint();
-            try {
-              controller.enqueue(encodeStreamError(e));
-            } catch {
-              /* ignore */
-            }
-            try {
-              controller.close();
-            } catch {
-              /* ignore */
-            }
+            safeEnqueue(encodeStreamError(e));
+            safeClose();
           }
         })();
       },

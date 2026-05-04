@@ -297,7 +297,7 @@ export async function runContinuityCheckForChapter(
     const { data: book, error: bookErr } = await supabase
       .from("books")
       .select(
-        "id, user_id, series_id, series_order, book_type, continuity_checks_enabled",
+        "id, user_id, series_id, series_order, book_type",
       )
       .eq("id", args.bookId)
       .eq("user_id", args.userId)
@@ -307,7 +307,27 @@ export async function runContinuityCheckForChapter(
       return { status: "error", reason: "book_fetch_failed" };
     }
     if (!book) return { status: "skipped", reason: "book_not_found" };
-    if (!book.continuity_checks_enabled) {
+
+    let continuityChecksEnabled = true;
+    const { data: continuityToggle, error: continuityToggleErr } = await supabase
+      .from("books")
+      .select("continuity_checks_enabled")
+      .eq("id", args.bookId)
+      .eq("user_id", args.userId)
+      .maybeSingle();
+    if (continuityToggleErr) {
+      const missingColumn =
+        continuityToggleErr.code === "42703" &&
+        String(continuityToggleErr.message ?? "").includes("continuity_checks_enabled");
+      if (!missingColumn) {
+        logServerError("continuity-check.toggle-fetch", continuityToggleErr);
+        return { status: "error", reason: "toggle_fetch_failed" };
+      }
+    } else if (continuityToggle) {
+      continuityChecksEnabled = continuityToggle.continuity_checks_enabled;
+    }
+
+    if (!continuityChecksEnabled) {
       return { status: "skipped", reason: "disabled_by_book" };
     }
     if (book.book_type === "non_fiction") {

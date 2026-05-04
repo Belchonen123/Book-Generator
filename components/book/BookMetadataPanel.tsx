@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { Loader2, Save, Sparkles } from "@/lib/lucide-icons";
@@ -21,6 +22,11 @@ export type BookMetadataPanelProps = {
     subtitle: string | null;
     authorDisplayName: string | null;
   }) => void;
+  onDraftChange?: (next: {
+    title: string;
+    subtitle: string | null;
+    authorDisplayName: string | null;
+  }) => void;
 };
 
 const FIELD_CLASS =
@@ -37,7 +43,9 @@ export function BookMetadataPanel({
   initialSubtitle,
   initialAuthorDisplayName,
   onSaved,
+  onDraftChange,
 }: BookMetadataPanelProps) {
+  const router = useRouter();
   const [title, setTitle] = useState(initialTitle);
   const [subtitle, setSubtitle] = useState(initialSubtitle ?? "");
   const [authorDisplayName, setAuthorDisplayName] = useState(
@@ -45,6 +53,14 @@ export function BookMetadataPanel({
   );
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    onDraftChange?.({
+      title,
+      subtitle: trimOrNull(subtitle),
+      authorDisplayName: trimOrNull(authorDisplayName),
+    });
+  }, [authorDisplayName, onDraftChange, subtitle, title]);
 
   const runGenerate = useCallback(async () => {
     setGenerating(true);
@@ -110,13 +126,14 @@ export function BookMetadataPanel({
         subtitle: nextSubtitle,
         authorDisplayName: nextAuthor,
       });
+      router.refresh();
     } catch (e) {
       console.error("[BookMetadataPanel] save threw", e);
       toast.error(e instanceof Error ? e.message : "Could not save metadata.");
     } finally {
       setSaving(false);
     }
-  }, [authorDisplayName, bookId, onSaved, subtitle, title]);
+  }, [authorDisplayName, bookId, onSaved, router, subtitle, title]);
 
   const busy = generating || saving;
 

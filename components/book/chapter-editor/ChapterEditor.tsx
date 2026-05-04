@@ -212,6 +212,13 @@ function isAbortError(err: unknown): boolean {
   return false;
 }
 
+/**
+ * Max wait per chapter (fetch + full stream + server persist). Slightly above
+ * `/api/ai/generate-chapter` `maxDuration` (300s) so the server can finish
+ * after the model stops; avoids bulk "Generate all" hanging forever on one chapter.
+ */
+const CHAPTER_STREAM_FETCH_TIMEOUT_MS = 330_000;
+
 function textblockRangeAt(editor: Editor, pos: number): { from: number; to: number } {
   const $pos = editor.state.doc.resolve(pos);
   for (let d = $pos.depth; d > 0; d -= 1) {
@@ -1548,6 +1555,12 @@ export function ChapterEditor({
         chapterGenerationStopToastShownRef.current = false;
       }
 
+      let timedOutByClient = false;
+      const streamDeadlineTimer = window.setTimeout(() => {
+        timedOutByClient = true;
+        generationAbortController.abort();
+      }, CHAPTER_STREAM_FETCH_TIMEOUT_MS);
+
       try {
         const res = await fetch("/api/ai/generate-chapter", {
           method: "POST",
@@ -1622,12 +1635,18 @@ export function ChapterEditor({
             streamFlushRaf.current = null;
           }
           flushStreamToEditor(accumulated);
+          /* Align hydration ref with streamed body so a fast `router.refresh()` does not
+           * treat the editor as newer than props and replace prose with an empty reverted row. */
+          serverContentRef.current = accumulated.trim();
+          setLocalStatus("draft");
         }
         return { ok: true };
       } catch (e) {
-        const generationCancelled =
-          isAbortError(e) || (displayInEditor && chapterGenerationCancelledRef.current);
-        if (generationCancelled) {
+        const userStopped =
+          isAbortError(e) &&
+          displayInEditor &&
+          chapterGenerationCancelledRef.current;
+        if (userStopped) {
           if (displayInEditor) {
             if (streamFlushRaf.current != null) {
               clearTimeout(streamFlushRaf.current);
@@ -1644,6 +1663,20 @@ export function ChapterEditor({
           }
           return { ok: false };
         }
+        if (isAbortError(e) && timedOutByClient) {
+          const minutes = Math.round(CHAPTER_STREAM_FETCH_TIMEOUT_MS / 60_000);
+          const timeoutMsg = `This chapter exceeded ${minutes} minutes and was cancelled. Try Regenerate on that chapter, or shorten steering notes / prior context.`;
+          if (displayInEditor && ed) {
+            toast.error(timeoutMsg);
+            setLocalStatus(chapter.status);
+            const html = markdownToHtml(chapter.content ?? "");
+            ed.commands.setContent(html, false);
+            setCurrentWords(countWords(ed.getText()));
+          } else {
+            toast.error(timeoutMsg);
+          }
+          return { ok: false };
+        }
         const msg = userFacingFetchError(e, "Chapter generation").message;
         if (displayInEditor && ed) {
           toast.error(msg);
@@ -1656,6 +1689,7 @@ export function ChapterEditor({
         }
         return { ok: false };
       } finally {
+        window.clearTimeout(streamDeadlineTimer);
         if (streamFlushRaf.current != null) {
           clearTimeout(streamFlushRaf.current);
           streamFlushRaf.current = null;

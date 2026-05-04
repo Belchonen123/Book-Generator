@@ -20,41 +20,21 @@ export function useExportDownloads(bookId: string, title: string, coverUrl: stri
     setCompileBusy(true);
     useGlobalProgressStore.getState().start();
     try {
-      const res = await fetch("/api/compile-book", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "same-origin",
-        body: JSON.stringify({ bookId, ...(trimSize ? { trimSize } : {}) }),
-      });
-
-      if (!res.ok) {
-        let msg = "Could not compile your book.";
-        try {
-          const j = (await res.json()) as { error?: string };
-          if (j.error) msg = j.error;
-        } catch {
-          /* ignore */
-        }
-        toast.error(msg);
-        return;
+      const params = new URLSearchParams({ bookId });
+      if (trimSize) {
+        params.set("trimSize", trimSize);
       }
-
-      const blob = await res.blob();
-      const fromHeader = parseFilenameFromDisposition(res.headers.get("Content-Disposition"));
-      const name = fromHeader ?? `${slugFileBase(title)}.docx`;
-      const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url;
-      a.download = name;
+      a.href = `/api/compile-book?${params.toString()}`;
+      a.download = `${slugFileBase(title)}.docx`;
       a.rel = "noopener";
       document.body.appendChild(a);
       a.click();
       a.remove();
-      URL.revokeObjectURL(url);
       toast.success("Your book download has started.");
       void recordBookDownloadAction(bookId);
     } catch {
-      toast.error("Network error while compiling.");
+      toast.error("Could not start the book download.");
     } finally {
       useGlobalProgressStore.getState().stop();
       setCompileBusy(false);

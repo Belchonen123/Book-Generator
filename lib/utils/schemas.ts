@@ -86,6 +86,9 @@ export const AudioGenerateRequestSchema = z.object({
 export const CoverRequestSchema = z.object({
   bookId: z.string().uuid(),
   customPrompt: z.string().min(1).max(4000).optional(),
+  title: z.string().min(1).max(160).optional(),
+  subtitle: z.string().max(240).nullable().optional(),
+  authorDisplayName: z.string().max(160).nullable().optional(),
 });
 
 /** POST /api/ai/generate-book-metadata */
