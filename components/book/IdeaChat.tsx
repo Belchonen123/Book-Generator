@@ -1088,7 +1088,7 @@ export function IdeaChat({
       >
         {messages.length === 0 ? (
           <p className="text-center text-sm text-editorial-muted">
-            Share what you are writing about. The editor will ask a few focused questions.
+            Share a rough book idea. The editor will draft a stronger direction and only ask what is necessary.
           </p>
         ) : null}
 

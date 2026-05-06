@@ -4,7 +4,10 @@ import type { CompletionUsage } from "openai/resources/completions";
 import type { Stream } from "openai/streaming";
 import { getOpenAI } from "@/lib/openai/client";
 import { openAIRequestFailureResponse } from "@/lib/openai/request-errors";
-import { getIdeaRefinementPromptForBookType } from "@/lib/ai/prompt-templates";
+import {
+  IDEA_REFINEMENT_DECISIVE_EDITOR_RULES,
+  getIdeaRefinementPromptForBookType,
+} from "@/lib/ai/prompt-templates";
 import { buildGenerationContext } from "@/lib/ai/context-assembler";
 import { buildSeriesContextInputForBook } from "@/lib/ai/series-context";
 import {
@@ -30,9 +33,27 @@ import type { Json } from "@/types/database.types";
 export const dynamic = "force-dynamic";
 
 const REFINED_IDEA_REGEX = /<REFINED_IDEA>([\s\S]*?)<\/REFINED_IDEA>/i;
+const LOW_SIGNAL_IDEA_MESSAGE_REGEX =
+  /^(hi|hello|hey|yo|test|testing|asdf|ok|okay|thanks|thank you)[.!?\s]*$/i;
+const LOW_SIGNAL_IDEA_REPLY =
+  "Ready. Send even a messy one-line book idea and I will turn it into a working premise.";
 
 function estimateTokensFromText(text: string): number {
   return Math.max(1, Math.ceil(text.length / 4));
+}
+
+function isLowSignalIdeaMessage(text: string): boolean {
+  const trimmed = text.trim();
+  return trimmed.length <= 24 && LOW_SIGNAL_IDEA_MESSAGE_REGEX.test(trimmed);
+}
+
+function textToStream(text: string): ReadableStream<Uint8Array> {
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode(text));
+      controller.close();
+    },
+  });
 }
 
 async function* streamWithUsageCapture(
@@ -107,9 +128,36 @@ export async function POST(request: Request) {
       { role: "user" as const, content: userMessage },
     ];
 
-    /* Idea refinement is conversational (the model asks questions one
-     * at a time), so style examples mostly shape the TEXTURE of the
-     * questions and the final <REFINED_IDEA> summary. The assembler
+    if (isLowSignalIdeaMessage(userMessage)) {
+      const assistantMessage = {
+        role: "assistant" as const,
+        content: LOW_SIGNAL_IDEA_REPLY,
+      };
+      const { error: updateError } = await supabase
+        .from("books")
+        .update({
+          idea_conversation: [...history, assistantMessage] as unknown as Json,
+        })
+        .eq("id", bookId)
+        .eq("user_id", user.id);
+
+      if (updateError) {
+        logServerError("refine-idea.low-signal-save", updateError, {
+          details: { bookId },
+        });
+      }
+
+      return new StreamingTextResponse(textToStream(LOW_SIGNAL_IDEA_REPLY), {
+        status: 200,
+        headers: {
+          "Cache-Control": "no-cache, no-transform",
+        },
+      });
+    }
+
+    /* Idea refinement is conversational, but the editor should draft
+     * useful structure before asking for more. Style examples mostly shape
+     * the TEXTURE of the questions and the final <REFINED_IDEA> summary. The assembler
      * still injects so the eventual voice_anchor field inherits the
      * author's chosen register when they haven't explicitly set one,
      * and codex matches from the running conversation catch any
@@ -146,7 +194,10 @@ export async function POST(request: Request) {
       variables: context.variables,
       fallbackPrompt: context.systemPrompt,
     });
-    const systemPrompt = resolvedPrompt.systemPrompt;
+    const systemPrompt = [
+      resolvedPrompt.systemPrompt,
+      IDEA_REFINEMENT_DECISIVE_EDITOR_RULES,
+    ].join("\n\n");
     const missingCriticalVars = missingRequiredVariables(
       resolvedPrompt.active.templateText,
       CRITICAL_VARIABLES_BY_TASK["refine-idea"],
